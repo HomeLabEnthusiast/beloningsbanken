@@ -2,21 +2,45 @@
 <html lang="sv">
 <head>
   <meta charset="UTF-8" />
-  <!-- PWA -->
+
+  <!-- ── PWA / iOS ── -->
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="Belöningsbanken" />
   <meta name="mobile-web-app-capable" content="yes" />
-  <meta name="theme-color" content="#f2f2f7" />
-  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#6c5cc8" />
+
+  <!-- Apple touch icon (required for iOS Add to Home Screen) -->
+  <link rel="apple-touch-icon" href="icons/icon-192.png" />
+  <link rel="apple-touch-icon" sizes="152x152" href="icons/icon-152.png" />
+  <link rel="apple-touch-icon" sizes="180x180" href="icons/icon-180.png" />
+  <link rel="apple-touch-icon" sizes="167x167" href="icons/icon-167.png" />
+
+  <!-- Manifest (external file in repo root) -->
+  <link rel="manifest" href="manifest.json" />
+
+  <!-- Service worker registration — single, from external sw.js -->
   <script>
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('sw.js');
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js', { scope: './' })
+          .catch(err => console.warn('SW registration failed:', err));
+      });
     }
+    // Android Chrome: capture install prompt for custom button
+    window._pwaInstallPrompt = null;
+    window.addEventListener('beforeinstallprompt', e => {
+      e.preventDefault();
+      window._pwaInstallPrompt = e;
+      document.dispatchEvent(new CustomEvent('pwa-installable'));
+    });
+    window.addEventListener('appinstalled', () => {
+      window._pwaInstallPrompt = null;
+    });
   </script>
 
   <!-- v1772630574 -->
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>🐷 Belöningsbanken</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet" />
@@ -820,7 +844,7 @@ function ActiveRewardWidget({ reward, onPause, onCancel, onDone }) {
           , React.createElement('span', {style:{
               fontSize:12, fontWeight:600, color: crit1 ? "#b91c1c" : "#8a6000",
               flex:1, lineHeight:1.3, letterSpacing:"-.01em"}},
-              crit1 ? "Sista minuten!" : "Snart dags att avsluta!"
+              crit1 ? "Dags att avsluta!" : "Snart dags att avsluta!"
             )
           , React.createElement('span', {style:{
               fontSize:13, fontWeight:700, color: crit1 ? "#b91c1c" : "#8a6000",
@@ -844,9 +868,6 @@ function ActiveRewardWidget({ reward, onPause, onCancel, onDone }) {
               animation: crit20 && !isPaused ? "countdown-flash 1s ease-in-out infinite" : "none"
             }},
               mm, ":", ss
-            )
-          , React.createElement('div', { style: {fontSize:10, fontWeight:500, marginTop:2, color:"#8e8e93"}},
-              P.status
             )
         )
         /* Controls */
@@ -2010,10 +2031,19 @@ function EarnChoiceDialog({child, mins, pointRatio, fixedPts, onChooseTime, onCh
   const points = (fixedPts !== null && fixedPts !== undefined) ? fixedPts : Math.round(mins * (pointRatio || 1));
   const activeTargets = (child.targets || []).filter(t => (t.pointsCollected||0) < t.cost);
   const currentPoints = child.points || 0;
-  const [step, setStep] = React.useState("choose"); // "choose" | "pick-target"
+  const [step, setStep] = React.useState("choose");
   const [selectedTarget, setSelectedTarget] = React.useState(null);
+  const [nudge, setNudge] = React.useState(false);
 
-  // Determine which options to show based on activity's rewardType
+  // After 3s without a choice, pulse the two option buttons
+  React.useEffect(() => {
+    if (step !== "choose") return;
+    const t = setTimeout(() => setNudge(true), 3000);
+    return () => clearTimeout(t);
+  }, [step]);
+  // Stop nudge as soon as user interacts
+  const stopNudge = () => setNudge(false);
+
   const showTime   = !rewardType || rewardType === "time" || rewardType === "fixed";
   const showPoints = !rewardType || rewardType === "time" || rewardType === "fixedPoints";
 
@@ -2023,8 +2053,9 @@ function EarnChoiceDialog({child, mins, pointRatio, fixedPts, onChooseTime, onCh
 
   const cTheme = child ? getTheme(child) : { bg:"#edeafb", border:"#d0caee", accent:"#6c5cc8", chip:"#ddd8f8" };
 
+  /* Locked overlay — clicks outside do nothing */
   const Overlay = ({children}) => React.createElement('div', { style: {
-    position:"fixed", inset:0, background:"rgba(0,0,0,0.45)",
+    position:"fixed", inset:0, background:"rgba(0,0,0,0.55)",
     display:"flex", alignItems:"center", justifyContent:"center",
     zIndex:1000, padding:"20px 16px"
   }}, children);
@@ -2032,7 +2063,7 @@ function EarnChoiceDialog({child, mins, pointRatio, fixedPts, onChooseTime, onCh
   const Sheet = ({children, maxW}) => React.createElement('div', { className:"bounce-in", style: {
     background:"white", borderRadius:20,
     border:".5px solid rgba(0,0,0,0.08)",
-    boxShadow:"0 1px 4px rgba(0,0,0,0.08)",
+    boxShadow:"0 8px 40px rgba(0,0,0,0.22)",
     maxWidth: maxW||380, width:"100%",
     overflow:"hidden"
   }}, children);
@@ -2050,7 +2081,7 @@ function EarnChoiceDialog({child, mins, pointRatio, fixedPts, onChooseTime, onCh
                 letterSpacing:"-0.3px", marginBottom:2
               }}, "Välj mål att spara mot")
             , React.createElement('div', { style: {fontSize:12, color:"#8e8e93", marginBottom:16}},
-                "+ ", points, " ⭐ att fördela")
+                "+ ", points, " 🏅 att fördela")
 
             , activeTargets.length === 0 && React.createElement('div', { style: {
                 background:"#f8f7f5", borderRadius:12, padding:"16px",
@@ -2078,7 +2109,7 @@ function EarnChoiceDialog({child, mins, pointRatio, fixedPts, onChooseTime, onCh
                   , React.createElement('div', { style: {flex:1}}
                     , React.createElement('div', { style: {fontSize:14, fontWeight:700, color:"#1c1c1e", marginBottom:1}}, t.name)
                     , React.createElement('div', { style: {fontSize:11, color:"#8e8e93", fontWeight:600}},
-                        before, " / ", t.cost, " ⭐",
+                        before, " / ", t.cost, " 🏅",
                         before < t.cost ? " · " + (t.cost - before) + " kvar" : "")
                   )
                   , isSelected && React.createElement('div', { style: {
@@ -2118,7 +2149,7 @@ function EarnChoiceDialog({child, mins, pointRatio, fixedPts, onChooseTime, onCh
                     cursor: (selectedTarget||activeTargets.length===0) ? "pointer" : "not-allowed",
                     color: (activeTargets.length===0||selectedTarget) ? "white" : "#aeaeb2",
                     fontWeight:800, fontSize:13}},
-                  selectedTarget ? "⭐ Spara mot " + selectedTarget.name : activeTargets.length===0 ? "⭐ Spara poäng" : "Välj ett mål ovan")
+                  selectedTarget ? "🏅 Spara mot " + selectedTarget.name : activeTargets.length===0 ? "🏅 Spara poäng" : "Välj ett mål ovan")
             )
           )
         )
@@ -2134,7 +2165,7 @@ function EarnChoiceDialog({child, mins, pointRatio, fixedPts, onChooseTime, onCh
         , React.createElement('div', { style: {padding:"20px 20px 18px"}}
 
           /* Header */
-          , React.createElement('div', { style: {display:"flex", alignItems:"center", gap:12, marginBottom:16}}
+          , React.createElement('div', { style: {display:"flex", alignItems:"center", gap:12, marginBottom:4}}
             , React.createElement('div', { style: {
                 width:44, height:44, borderRadius:14, flexShrink:0,
                 background: cTheme.bg, border: `.5px solid ${cTheme.border}`,
@@ -2145,19 +2176,38 @@ function EarnChoiceDialog({child, mins, pointRatio, fixedPts, onChooseTime, onCh
               , React.createElement('div', { style: {fontSize:16, fontWeight:800, color:"#1c1c1e", letterSpacing:"-0.3px"}},
                   "Bra jobbat, ", child.name, "!")
               , React.createElement('div', { style: {fontSize:12, color:"#8e8e93", marginTop:1}},
-                  "Du tjänade ", React.createElement('strong', { style:{color:"#1c1c1e"}}, mins, " minuter"),
-                  showTime && showPoints ? " — vad väljer du?" : showTime ? " — klart att använda!" : " — sparas som poäng!")
+                  "Du tjänade ", React.createElement('strong', { style:{color:"#1c1c1e"}}, mins, " minuter"))
             )
           )
 
-          /* Tid-knapp — visas för "time" och "fixed" */
-          , showTime && React.createElement('button', { onClick: onChooseTime, style: {
-              width:"100%", background: "#e0f5ec",
-              border: ".5px solid #b8e8d4",
-              borderRadius:14, padding:"14px 16px",
-              cursor:"pointer", display:"flex", alignItems:"center",
-              gap:12, textAlign:"left", marginBottom: showPoints ? 10 : 16
+          /* Mandatory choice label */
+          , showTime && showPoints && React.createElement('div', { style: {
+              fontSize:13, fontWeight:700,
+              color: nudge ? "#b91c1c" : "#3c3c43",
+              marginBottom:12, marginTop:10,
+              display:"flex", alignItems:"center", gap:6,
+              animation: nudge ? "pulse 0.6s ease infinite" : "none",
+              transition:"color 0.3s"
             }}
+            , nudge ? "👆 " : "👇 "
+            , "Välj hur du vill spara dina minuter:"
+          )
+          , (!showTime || !showPoints) && React.createElement('div', { style: {height:10}})
+
+          /* Tid-knapp */
+          , showTime && React.createElement('button', {
+              onClick: () => { stopNudge(); onChooseTime(); },
+              style: {
+                width:"100%", background: "#e0f5ec",
+                border: nudge ? "2px solid #1a9464" : ".5px solid #b8e8d4",
+                borderRadius:14, padding:"14px 16px",
+                cursor:"pointer", display:"flex", alignItems:"center",
+                gap:12, textAlign:"left",
+                marginBottom: showPoints ? 10 : 16,
+                animation: nudge ? "pulse 0.8s ease infinite" : "none",
+                transform: nudge ? "scale(1.01)" : "scale(1)",
+                transition:"border 0.3s, transform 0.3s"
+              }}
             , React.createElement('div', { style: {
                 width:40, height:40, borderRadius:12, flexShrink:0,
                 background:"#1a9464",
@@ -2171,24 +2221,29 @@ function EarnChoiceDialog({child, mins, pointRatio, fixedPts, onChooseTime, onCh
             )
           )
 
-          /* Poäng-knapp — visas för "time" och "fixedPoints" */
-          , showPoints && React.createElement('button', { onClick: () => setStep("pick-target"), style: {
-              width:"100%", background: cTheme.bg,
-              border: `.5px solid ${cTheme.border}`,
-              borderRadius:14, padding:"14px 16px",
-              cursor:"pointer", display:"flex", alignItems:"center",
-              gap:12, textAlign:"left", marginBottom:16
-            }}
+          /* Poäng-knapp */
+          , showPoints && React.createElement('button', {
+              onClick: () => { stopNudge(); setStep("pick-target"); },
+              style: {
+                width:"100%", background: cTheme.bg,
+                border: nudge ? `2px solid ${cTheme.accent}` : `.5px solid ${cTheme.border}`,
+                borderRadius:14, padding:"14px 16px",
+                cursor:"pointer", display:"flex", alignItems:"center",
+                gap:12, textAlign:"left", marginBottom:16,
+                animation: nudge ? "pulse 0.8s ease infinite" : "none",
+                transform: nudge ? "scale(1.01)" : "scale(1)",
+                transition:"border 0.3s, transform 0.3s"
+              }}
             , React.createElement('div', { style: {
                 width:40, height:40, borderRadius:12, flexShrink:0,
                 background: cTheme.accent,
                 display:"flex", alignItems:"center", justifyContent:"center",
                 fontSize:20
-              }}, "⭐")
+              }}, "🏅")
             , React.createElement('div', { style: {flex:1}}
-              , React.createElement('div', { style: {fontSize:14, fontWeight:800, color: cTheme.text, lineHeight:1.2}}, "Spara som poäng!")
+              , React.createElement('div', { style: {fontSize:14, fontWeight:800, color:"#1c1c1e", lineHeight:1.2}}, "Spara som poäng!")
               , React.createElement('div', { style: {fontSize:11, color: cTheme.accent, marginTop:2, fontWeight:600}},
-                  "+ ", points, " ⭐ → totalt ", currentPoints + points, " poäng")
+                  "+ ", points, " 🏅 → totalt ", currentPoints + points, " poäng")
               , activeTargets.length > 0 && React.createElement('div', { style: {fontSize:10, color:"#8e8e93", marginTop:2}},
                   "Välj vilket mål poängen ska gå till →")
             )
@@ -2881,6 +2936,29 @@ function HomeView({data, setData, setView, setActiveChild, showToast, showVictor
                   , React.createElement('div', { style: {height:"100%",
                       width:`${Math.min(100, debtCleared/(debtTotal||1)*100)}%`,
                       background:"#ef4444", borderRadius:99, transition:"width 0.7s ease"}})
+                )
+              )
+
+              /* ── Active reward notice ── */
+              , child.activeReward && (
+                React.createElement('div', { style: {
+                    borderTop: ".5px solid rgba(0,0,0,0.07)",
+                    padding:"10px 14px 10px"}}
+                  , React.createElement('div', {style:{
+                      fontSize:11, fontWeight:700, color:"#3c3c43",
+                      letterSpacing:".04em", marginBottom:6,
+                      display:"flex", alignItems:"center", gap:6}}
+                    , React.createElement('div', {style:{
+                        width:3, height:12, borderRadius:99,
+                        background:"#c47a00", flexShrink:0}})
+                    , "Belöning pågår"
+                  )
+                  , React.createElement(ActiveRewardWidget, {
+                    reward: child.activeReward,
+                    onPause: (elapsed, paused) => handleRewardPause(child.id, elapsed, paused),
+                    onCancel: () => handleRewardCancel(child.id),
+                    onDone: () => handleRewardDone(child.id, child.activeReward.label || 'Belöning')}
+                  )
                 )
               )
 
@@ -7412,6 +7490,17 @@ function App() {
   const [victoryCard,   setVictoryCard]   = useState(null); // {emoji,title,lines:[]}
   const [adminUnlocked, setAdminUnlocked] = useState(false);
   const [routineFromSplit, setRoutineFromSplit] = useState(false);
+  const [pwaInstallable, setPwaInstallable] = useState(false);
+  const [showIOSHint, setShowIOSHint] = useState(false);
+
+  // Listen for Android install prompt availability
+  useEffect(() => {
+    const onInstallable = () => setPwaInstallable(true);
+    document.addEventListener('pwa-installable', onInstallable);
+    if (window._pwaInstallPrompt) setPwaInstallable(true);
+    if (window._showIOSInstallHint) setShowIOSHint(true);
+    return () => document.removeEventListener('pwa-installable', onInstallable);
+  }, []);
   const toastTimer   = useRef(null);
   const victoryTimer = useRef(null);
 
@@ -7703,8 +7792,7 @@ function App() {
   };
 
   return (
-    React.createElement('div', { style: {minHeight:"100vh",
-      background:"#f2f2f7"}}
+    React.createElement('div', { style: {minHeight:"100vh", background:"#f2f2f7"}}
 
       , React.createElement('header', { style: {
         background:"rgba(242,242,247,0.92)",
@@ -7779,6 +7867,59 @@ function App() {
                 display:"flex",alignItems:"center",gap:6}}, "🔒 Admin"
             )
           )
+        )
+      )
+
+      /* ── Android install banner ── */
+      , pwaInstallable && React.createElement('div', { style: {
+          background:"#6c5cc8", color:"white",
+          padding:"10px 16px", display:"flex", alignItems:"center",
+          justifyContent:"space-between", gap:12, fontSize:13,
+          position:"sticky", top:54, zIndex:99,
+          boxShadow:"0 2px 8px rgba(108,92,200,0.3)"}}
+        , React.createElement('div', null
+          , React.createElement('div', {style:{fontWeight:700, lineHeight:1.2}}, "📲 Installera Belöningsbanken")
+          , React.createElement('div', {style:{fontSize:11, opacity:0.85, marginTop:2}}, "Lägg till som app på hemskärmen")
+        )
+        , React.createElement('div', {style:{display:"flex", gap:8, flexShrink:0}}
+          , React.createElement('button', {
+              onClick: async () => {
+                if (window._pwaInstallPrompt) {
+                  window._pwaInstallPrompt.prompt();
+                  const { outcome } = await window._pwaInstallPrompt.userChoice;
+                  if (outcome === 'accepted') { window._pwaInstallPrompt = null; setPwaInstallable(false); }
+                }
+              },
+              style:{background:"white", color:"#6c5cc8", border:"none",
+                borderRadius:8, padding:"6px 14px", fontWeight:800,
+                fontSize:12, cursor:"pointer"}},
+              "Installera")
+          , React.createElement('button', {
+              onClick: () => setPwaInstallable(false),
+              style:{background:"rgba(255,255,255,0.2)", color:"white", border:"none",
+                borderRadius:8, padding:"6px 10px", fontWeight:700,
+                fontSize:12, cursor:"pointer"}},
+              "✕")
+        )
+      )
+
+      /* ── iOS "Add to Home Screen" hint ── */
+      , showIOSHint && React.createElement('div', { style: {
+          background:"#1c1c1e", color:"white",
+          padding:"12px 16px 16px", fontSize:13,
+          position:"sticky", top:54, zIndex:99}}
+        , React.createElement('div', {style:{display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:8}}
+          , React.createElement('div', {style:{fontWeight:700, fontSize:14}}, "📲 Installera som app")
+          , React.createElement('button', {
+              onClick: () => setShowIOSHint(false),
+              style:{background:"rgba(255,255,255,0.15)", color:"white", border:"none",
+                borderRadius:6, padding:"2px 8px", fontSize:12, cursor:"pointer"}},
+              "✕")
+        )
+        , React.createElement('ol', {style:{margin:0, paddingLeft:18, lineHeight:2, opacity:0.9}}
+          , React.createElement('li', null, "Tryck på ", React.createElement('strong', null, "Dela-knappen"), " 󰍳 längst ner i Safari")
+          , React.createElement('li', null, "Välj ", React.createElement('strong', null, "\"Lägg till på hemskärmen\""))
+          , React.createElement('li', null, "Tryck ", React.createElement('strong', null, "\"Lägg till\""), " — klart! 🎉")
         )
       )
 
@@ -7977,25 +8118,16 @@ ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(
 </script>
 
   <script>
-    if ('serviceWorker' in navigator) {
-      const swCode = `
-        const CACHE = 'belöningsbanken-v1';
-        self.addEventListener('install', e => {
-          e.waitUntil(caches.open(CACHE).then(c => c.addAll(['./', './index.html'])));
-          self.skipWaiting();
-        });
-        self.addEventListener('activate', e => {
-          e.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))));
-          self.clients.claim();
-        });
-        self.addEventListener('fetch', e => {
-          e.respondWith(caches.match(e.request).then(r => r || fetch(e.request).catch(() => caches.match('./'))));
-        });
-      `;
-      const blob = new Blob([swCode], {type: 'application/javascript'});
-      const swUrl = URL.createObjectURL(blob);
-      navigator.serviceWorker.register(swUrl).catch(() => {});
-    }
+    // PWA Install UI — shown by React app via window._pwaInstallPrompt
+    // iOS guide injected if running in Safari (not already installed)
+    (function() {
+      const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+      const isInStandaloneMode = window.matchMedia('(display-mode: standalone)').matches
+        || window.navigator.standalone === true;
+      if (isIOS && !isInStandaloneMode) {
+        window._showIOSInstallHint = true;
+      }
+    })();
   </script>
 </body>
 </html>
