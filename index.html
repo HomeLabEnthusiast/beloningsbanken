@@ -55,6 +55,13 @@
     .action-btn{transition:background 0.15s,transform 0.12s;-webkit-tap-highlight-color:transparent;user-select:none;}
     .action-btn:hover{background:var(--action-hover-bg)!important;}
     .action-btn:active{transform:scale(0.93);background:var(--action-active-bg)!important;}
+    .hold-stop{
+      -webkit-touch-callout:none;
+      -webkit-user-select:none;
+      user-select:none;
+      touch-action:none;
+      -webkit-tap-highlight-color:transparent;
+    }
 
     .modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:200;
       display:flex;align-items:center;justify-content:center;padding:16px;}
@@ -3095,6 +3102,8 @@ function HoldToStop({ onStop, color, compact, pillBar }) {
   const offset = circ * (1 - progress / 100);
   if (pillBar) return (
     React.createElement('button', {
+      className: "hold-stop",
+      onContextMenu: e => e.preventDefault(),
       onMouseDown: startHold, onMouseUp: cancelHold, onMouseLeave: cancelHold,
       onTouchStart: e => { e.preventDefault(); startHold(); },
       onTouchEnd: cancelHold, onTouchCancel: cancelHold,
@@ -3122,8 +3131,10 @@ function HoldToStop({ onStop, color, compact, pillBar }) {
             style:{transition:"stroke-dashoffset 0.03s linear"}})
       )
       , React.createElement('button', {
+          className: "hold-stop",
+          onContextMenu: e => e.preventDefault(),
           onMouseDown:startHold, onMouseUp:cancelHold, onMouseLeave:cancelHold,
-          onTouchStart:e=>{e.preventDefault();startHold();}, onTouchEnd:cancelHold,
+          onTouchStart:e=>{e.preventDefault();startHold();}, onTouchEnd:cancelHold, onTouchCancel:cancelHold,
           style:{position:"absolute",inset:4,
             background:progress>0?"linear-gradient(135deg,#ef4444,#dc2626)":"#f8fafc",
             border:"none",borderRadius:"50%",cursor:"pointer",
