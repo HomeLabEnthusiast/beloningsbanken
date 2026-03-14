@@ -1,12 +1,6 @@
 <!DOCTYPE html>
 <html lang="sv">
 <head>
-<link rel="manifest" href="manifest.json">
-<script>
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('sw.js');
-  }
-</script>
   <meta charset="UTF-8" />
   <!-- PWA -->
   <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -14,7 +8,12 @@
   <meta name="apple-mobile-web-app-title" content="Belöningsbanken" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="theme-color" content="#f2f2f7" />
-  <link rel="manifest" href="data:application/json;charset=utf-8,%7B%22name%22%3A%22Bel%C3%B6ningsbanken%22%2C%22short_name%22%3A%22Bel%C3%B6ningen%22%2C%22start_url%22%3A%22.%2F%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%23fff8f0%22%2C%22theme_color%22%3A%22%23f97316%22%2C%22icons%22%3A%5B%7B%22src%22%3A%22data%3Aimage%2Fsvg%2Bxml%2C%253Csvg%2520xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%2520viewBox%3D'0%25200%252064%252064'%253E%253Crect%2520width%3D'64'%2520height%3D'64'%2520rx%3D'14'%2520fill%3D'%2523f97316'%2F%253E%253Ctext%2520x%3D'32'%2520y%3D'46'%2520text-anchor%3D'middle'%2520font-size%3D'40'%253E%25F0%259F%25B7%2590%253C%2Ftext%253E%253C%2Fsvg%253E%22%2C%22sizes%22%3A%22any%22%2C%22type%22%3A%22image%2Fsvg%2Bxml%22%7D%5D%7D" />
+  <link rel="manifest" href="manifest.json">
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('sw.js');
+    }
+  </script>
 
   <!-- v1772630574 -->
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -3072,13 +3071,19 @@ function HomeView({data, setData, setView, setActiveChild, showToast, showVictor
 function HoldToStop({ onStop, color, compact, pillBar }) {
   const [progress, setProgress] = React.useState(0);
   const intervalRef = React.useRef(null);
+  const firedRef = React.useRef(false);
   const HOLD_MS = 1800, TICK = 30;
   const startHold = () => {
     if (intervalRef.current) return;
+    firedRef.current = false;
     intervalRef.current = setInterval(() => {
       setProgress(p => {
         const next = p + (TICK / HOLD_MS) * 100;
-        if (next >= 100) { clearInterval(intervalRef.current); intervalRef.current = null; onStop(); return 0; }
+        if (next >= 100) {
+          clearInterval(intervalRef.current); intervalRef.current = null;
+          if (!firedRef.current) { firedRef.current = true; onStop(); }
+          return 0;
+        }
         return next;
       });
     }, TICK);
@@ -3090,8 +3095,9 @@ function HoldToStop({ onStop, color, compact, pillBar }) {
   const offset = circ * (1 - progress / 100);
   if (pillBar) return (
     React.createElement('button', {
-      onMouseDown: startHold, onMouseUp: cancelHold,
-      onTouchStart: startHold, onTouchEnd: cancelHold,
+      onMouseDown: startHold, onMouseUp: cancelHold, onMouseLeave: cancelHold,
+      onTouchStart: e => { e.preventDefault(); startHold(); },
+      onTouchEnd: cancelHold, onTouchCancel: cancelHold,
       style: {
         background: "none", border: "none",
         width: "100%", padding: "10px 0",
@@ -3148,6 +3154,7 @@ function TimerPanel({child, updateChild, showToast, activities, activityCategori
 
   const doStop = () => {
     if (secs < 5) { showToast("⚡ För kort! Fortsätt lite till!"); return; }
+    if (phase === "done") return; // already stopped — ignore repeat touch events
     setTimerState(p => ({...p, running: false, phase: "done"}));
     const rawMins = Math.ceil(secs / 60);
     const mins = (act && act.rewardType === "fixed" && act.fixedMinutes) ? act.fixedMinutes : rawMins;
@@ -3681,6 +3688,7 @@ function TimerView({child, updateChild, showToast, activities, activityCategorie
             , React.createElement(HoldToStop, {
                 onStop: () => {
                   if (secs < 5) { showToast("⚡ För kort!"); return; }
+                  if (timerState.phase === "done") return; // guard repeat touch
                   setTimerState(p => ({...p, running:false, phase:"done"}));
                   const rawMins = Math.ceil(secs / 60);
                   const mins = (act && act.rewardType === "fixed" && act.fixedMinutes) ? act.fixedMinutes : rawMins;
