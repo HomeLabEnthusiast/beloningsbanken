@@ -2750,25 +2750,24 @@ function HomeView({data, setData, setView, setActiveChild, showToast, showVictor
           return React.createElement('div', {
             onClick: () => { setActiveChild(activeKids[0].id); setView("timer"); },
             style: {
-              margin:"20px 0 20px",
-              background:"linear-gradient(135deg,#fff7ed,#ffedd5)",
-              border:"2px solid #f97316",
-              borderRadius:16,
-              padding:"12px 16px",
+              margin:"16px 0 8px",
+              background:"white",
+              border:".5px solid rgba(0,0,0,0.08)",
+              borderLeft:"3px solid #f97316",
+              borderRadius:"0 12px 12px 0",
+              padding:"11px 14px",
               display:"flex", alignItems:"center", gap:12,
               cursor:"pointer",
-              boxShadow:"0 2px 12px rgba(249,115,22,0.2)",
-              animation:"pulse 2s ease infinite"
+              boxShadow:"0 1px 4px rgba(0,0,0,0.06)"
             }}
-            , React.createElement('span', {style:{fontSize:24}}, "⏱")
+            , React.createElement('span', {style:{fontSize:20, flexShrink:0}}, "⏱")
             , React.createElement('div', {style:{flex:1}}
-              , React.createElement('div', {style:{fontFamily:"'Fredoka One',cursive",
-                  fontSize:15, color:"#ea580c", marginBottom:2}},
+              , React.createElement('div', {style:{fontSize:13, fontWeight:800, color:"#1c1c1e", marginBottom:2}},
                 "Timers pågår!")
-              , React.createElement('div', {style:{fontSize:12, color:"#9a3412", fontWeight:600}},
+              , React.createElement('div', {style:{fontSize:12, color:"#8e8e93", fontWeight:600}},
                 activeKids.map(k => k.emoji+" "+k.name).join(" · "))
             )
-            , React.createElement('span', {style:{fontSize:13, fontWeight:800, color:"#ea580c"}},
+            , React.createElement('span', {style:{fontSize:12, fontWeight:700, color:"#f97316"}},
               "Öppna →")
           );
         })()
