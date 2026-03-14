@@ -5963,6 +5963,7 @@ function SettingsView({data, setData, showToast, timerStates, setTimerStates, on
   const [showExportModal, setShowExportModal] = useState(false);
   const [showQRModal,     setShowQRModal]     = useState(false);
   const [qrMode,          setQrMode]          = useState('show'); // 'show' | 'scan'
+  const [showInstallQR,   setShowInstallQR]   = useState(false);
   const [qrDataUrl,       setQrDataUrl]       = useState(null);
   const [qrError,         setQrError]         = useState(null);
   const [qrChunks,        setQrChunks]        = useState([]);    // array of b64 strings
@@ -7131,6 +7132,19 @@ function SettingsView({data, setData, showToast, timerStates, setTimerStates, on
 
             , React.createElement('div', { style: {fontSize:11,fontWeight:600,color:"#8e8e93",letterSpacing:".06em",textTransform:"uppercase",padding:"12px 16px 8px"}}, "Åtgärder")
 
+            /* Installera app via QR */
+            , React.createElement('button', { className:"btn-big", onClick:()=>setShowInstallQR(true),
+                style:{width:"100%",display:"flex",alignItems:"center",gap:12,padding:"12px 16px",
+                  background:"none",border:"none",borderTop:".5px solid rgba(0,0,0,0.06)",cursor:"pointer",textAlign:"left"}}
+              , React.createElement('div', { style:{width:36,height:36,borderRadius:10,background:"#edeafb",
+                  display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}, "📲")
+              , React.createElement('div', null
+                , React.createElement('div', { style:{fontSize:13,fontWeight:800,color:"#1c1c1e"}}, "Installera appen")
+                , React.createElement('div', { style:{fontSize:11,color:"#8e8e93",marginTop:1}}, "QR-kod för att öppna och installera")
+              )
+              , React.createElement('div', { style:{marginLeft:"auto",fontSize:16,color:"#aeaeb2"}}, "›")
+            )
+
             /* Exportera */
             , React.createElement('button', { className:"btn-big", onClick:()=>setShowExportModal(true),
                 style:{width:"100%",display:"flex",alignItems:"center",gap:12,padding:"12px 16px",
@@ -7182,6 +7196,46 @@ function SettingsView({data, setData, showToast, timerStates, setTimerStates, on
 
           /* ── PIN-kort ── */
           , React.createElement(ChangePinSection, { showToast: showToast})
+        )
+      )
+
+      /* ── Install QR Modal ── */
+      , showInstallQR && React.createElement('div', { style:{
+          position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",
+          zIndex:300,display:"flex",alignItems:"center",justifyContent:"center",padding:20}}
+        , React.createElement('div', { style:{
+            background:"white",borderRadius:20,padding:"24px 20px",
+            maxWidth:340,width:"100%",textAlign:"center",
+            boxShadow:"0 20px 60px rgba(0,0,0,0.2)"}}
+          , React.createElement('div', { style:{fontSize:32,marginBottom:8}}, "📲")
+          , React.createElement('div', { style:{fontSize:17,fontWeight:800,color:"#1c1c1e",marginBottom:4}}, "Installera Belöningsbanken")
+          , React.createElement('div', { style:{fontSize:12,color:"#8e8e93",marginBottom:16,lineHeight:1.5}},
+              "Skanna med telefon eller surfplatta för att öppna appen och installera den på hemskärmen")
+          , React.createElement('div', {
+              style:{display:"flex",justifyContent:"center",marginBottom:16},
+              ref: el => {
+                if (el && !el.hasChildNodes()) {
+                  const url = 'https://homelabenthusiast.github.io/beloningsbanken/';
+                  try {
+                    new QRCode(el, {
+                      text: url, width:200, height:200,
+                      colorDark:"#1c1c1e", colorLight:"#ffffff",
+                      correctLevel: QRCode.CorrectLevel.M
+                    });
+                  } catch(e) {
+                    el.innerHTML = '<div style="padding:16px;color:#8e8e93;font-size:11px;">Kunde inte generera QR</div>';
+                  }
+                }
+              }
+            })
+          , React.createElement('div', { style:{
+              background:"#f8f7f5",borderRadius:10,padding:"8px 12px",
+              fontSize:11,color:"#6d6d72",marginBottom:16,wordBreak:"break-all",userSelect:"all"
+            }}, 'https://homelabenthusiast.github.io/beloningsbanken/')
+          , React.createElement('button', { onClick:()=>setShowInstallQR(false),
+              style:{width:"100%",background:"#6c5cc8",border:"none",borderRadius:12,
+                padding:"12px",color:"white",fontWeight:800,fontSize:14,cursor:"pointer"}},
+              "Stäng")
         )
       )
 
