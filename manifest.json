@@ -1,6 +1,6 @@
 {
   "name": "Min Privata App",
-  "short_name": "Appen",
+  "short_name": "Belöningsbanken",
   "start_url": "./",
   "display": "standalone",
   "background_color": "#ffffff",
