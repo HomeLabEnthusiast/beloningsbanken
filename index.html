@@ -3,41 +3,14 @@
 <head>
   <meta charset="UTF-8" />
 
-  <!-- ── PWA / iOS ── -->
+  <!-- ── PWA ── -->
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="Belöningsbanken" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="theme-color" content="#6c5cc8" />
-
-  <!-- Apple touch icon (required for iOS Add to Home Screen) -->
   <link rel="apple-touch-icon" href="icons/icon-192.png" />
-  <link rel="apple-touch-icon" sizes="152x152" href="icons/icon-152.png" />
-  <link rel="apple-touch-icon" sizes="180x180" href="icons/icon-180.png" />
-  <link rel="apple-touch-icon" sizes="167x167" href="icons/icon-167.png" />
-
-  <!-- Manifest (external file in repo root) -->
   <link rel="manifest" href="manifest.json" />
-
-  <!-- Service worker registration — single, from external sw.js -->
-  <script>
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('sw.js', { scope: './' })
-          .catch(err => console.warn('SW registration failed:', err));
-      });
-    }
-    // Android Chrome: capture install prompt for custom button
-    window._pwaInstallPrompt = null;
-    window.addEventListener('beforeinstallprompt', e => {
-      // Do NOT call e.preventDefault() — let the native prompt show automatically
-      window._pwaInstallPrompt = e;
-      document.dispatchEvent(new CustomEvent('pwa-installable'));
-    });
-    window.addEventListener('appinstalled', () => {
-      window._pwaInstallPrompt = null;
-    });
-  </script>
 
   <!-- v1772630574 -->
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
@@ -7549,17 +7522,6 @@ function App() {
   const [victoryCard,   setVictoryCard]   = useState(null); // {emoji,title,lines:[]}
   const [adminUnlocked, setAdminUnlocked] = useState(false);
   const [routineFromSplit, setRoutineFromSplit] = useState(false);
-  const [pwaInstallable, setPwaInstallable] = useState(false);
-  const [showIOSHint, setShowIOSHint] = useState(false);
-
-  // Listen for Android install prompt availability
-  useEffect(() => {
-    const onInstallable = () => setPwaInstallable(true);
-    document.addEventListener('pwa-installable', onInstallable);
-    if (window._pwaInstallPrompt) setPwaInstallable(true);
-    if (window._showIOSInstallHint) setShowIOSHint(true);
-    return () => document.removeEventListener('pwa-installable', onInstallable);
-  }, []);
   const toastTimer   = useRef(null);
   const victoryTimer = useRef(null);
 
@@ -7929,59 +7891,6 @@ function App() {
         )
       )
 
-      /* ── Android install banner ── */
-      , pwaInstallable && React.createElement('div', { style: {
-          background:"#6c5cc8", color:"white",
-          padding:"10px 16px", display:"flex", alignItems:"center",
-          justifyContent:"space-between", gap:12, fontSize:13,
-          position:"sticky", top:54, zIndex:99,
-          boxShadow:"0 2px 8px rgba(108,92,200,0.3)"}}
-        , React.createElement('div', null
-          , React.createElement('div', {style:{fontWeight:700, lineHeight:1.2}}, "📲 Installera Belöningsbanken")
-          , React.createElement('div', {style:{fontSize:11, opacity:0.85, marginTop:2}}, "Lägg till som app på hemskärmen")
-        )
-        , React.createElement('div', {style:{display:"flex", gap:8, flexShrink:0}}
-          , React.createElement('button', {
-              onClick: async () => {
-                if (window._pwaInstallPrompt) {
-                  window._pwaInstallPrompt.prompt();
-                  const { outcome } = await window._pwaInstallPrompt.userChoice;
-                  if (outcome === 'accepted') { window._pwaInstallPrompt = null; setPwaInstallable(false); }
-                }
-              },
-              style:{background:"white", color:"#6c5cc8", border:"none",
-                borderRadius:8, padding:"6px 14px", fontWeight:800,
-                fontSize:12, cursor:"pointer"}},
-              "Installera")
-          , React.createElement('button', {
-              onClick: () => setPwaInstallable(false),
-              style:{background:"rgba(255,255,255,0.2)", color:"white", border:"none",
-                borderRadius:8, padding:"6px 10px", fontWeight:700,
-                fontSize:12, cursor:"pointer"}},
-              "✕")
-        )
-      )
-
-      /* ── iOS "Add to Home Screen" hint ── */
-      , showIOSHint && React.createElement('div', { style: {
-          background:"#1c1c1e", color:"white",
-          padding:"12px 16px 16px", fontSize:13,
-          position:"sticky", top:54, zIndex:99}}
-        , React.createElement('div', {style:{display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:8}}
-          , React.createElement('div', {style:{fontWeight:700, fontSize:14}}, "📲 Installera som app")
-          , React.createElement('button', {
-              onClick: () => setShowIOSHint(false),
-              style:{background:"rgba(255,255,255,0.15)", color:"white", border:"none",
-                borderRadius:6, padding:"2px 8px", fontSize:12, cursor:"pointer"}},
-              "✕")
-        )
-        , React.createElement('ol', {style:{margin:0, paddingLeft:18, lineHeight:2, opacity:0.9}}
-          , React.createElement('li', null, "Tryck på ", React.createElement('strong', null, "Dela-knappen"), " 󰍳 längst ner i Safari")
-          , React.createElement('li', null, "Välj ", React.createElement('strong', null, "\"Lägg till på hemskärmen\""))
-          , React.createElement('li', null, "Tryck ", React.createElement('strong', null, "\"Lägg till\""), " — klart! 🎉")
-        )
-      )
-
       , effectiveView === "home" && (
         React.createElement(HomeView, { data: data, setData: setData, setView: setView,
           setActiveChild: setActiveChild, showToast: showToast, showVictory: showVictory,
@@ -8177,16 +8086,29 @@ ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(
 </script>
 
   <script>
-    // PWA Install UI — shown by React app via window._pwaInstallPrompt
-    // iOS guide injected if running in Safari (not already installed)
-    (function() {
-      const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
-      const isInStandaloneMode = window.matchMedia('(display-mode: standalone)').matches
-        || window.navigator.standalone === true;
-      if (isIOS && !isInStandaloneMode) {
-        window._showIOSInstallHint = true;
-      }
-    })();
+    if ('serviceWorker' in navigator) {
+      const swCode = `
+        const CACHE = 'beloningsbanken-v2';
+        self.addEventListener('install', e => {
+          self.skipWaiting();
+          e.waitUntil(caches.open(CACHE).then(c => c.addAll(['./'])));
+        });
+        self.addEventListener('activate', e => {
+          e.waitUntil(caches.keys().then(keys =>
+            Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
+          ));
+          self.clients.claim();
+        });
+        self.addEventListener('fetch', e => {
+          e.respondWith(
+            caches.match(e.request).then(r => r || fetch(e.request).catch(() => caches.match('./')))
+          );
+        });
+      `;
+      const blob = new Blob([swCode], { type: 'application/javascript' });
+      const swUrl = URL.createObjectURL(blob);
+      navigator.serviceWorker.register(swUrl).catch(() => {});
+    }
   </script>
 </body>
 </html>
