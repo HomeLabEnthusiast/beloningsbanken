@@ -59,6 +59,7 @@
       touch-action:none;
       -webkit-tap-highlight-color:transparent;
     }
+    @media(min-width:640px){.split-timer-grid{flex-direction:row!important;align-items:flex-start!important;}}
 
     .modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:200;
       display:flex;align-items:center;justify-content:center;padding:16px;}
@@ -3814,7 +3815,11 @@ function SplitTimerView({kidList, updateChild, showToast, activities, activityCa
 
   return (
     React.createElement('div', { style: {padding:"10px 8px 24px", maxWidth:1000, margin:"0 auto"}}
-      , React.createElement('div', { style: {display:"flex", gap:10, alignItems:"flex-start", flexWrap:"wrap"}}
+      , React.createElement('div', { className:"split-timer-grid", style: {
+          display:"flex",
+          flexDirection:"column",
+          gap:12
+        }}
         , kidList.map((kid, kidIdx) => {
           const col = (() => { const t = getTheme(kid); return {bg:t.bg, border:t.border, accent:t.accent, chip:t.chip, chipText:t.chipText}; })();
           const timerState = timerStates[kid.id] || blank;
@@ -3846,7 +3851,7 @@ function SplitTimerView({kidList, updateChild, showToast, activities, activityCa
           if (hasNoActiveTimer) {
             return (
               React.createElement('div', { key: kid.id, style: {
-                  flex:"1 1 0", minWidth:0, background:"white",
+                  flex:"1 1 300px", minWidth:0, background:"white",
                   border:".5px solid rgba(0,0,0,0.08)", borderRadius:16,
                   overflow:"hidden", opacity:0.85}}
 
@@ -3890,7 +3895,7 @@ function SplitTimerView({kidList, updateChild, showToast, activities, activityCa
           /* ── ACTIVE card ── */
           return (
             React.createElement('div', { key: kid.id, style: {
-                flex:"1 1 0", minWidth:0, background:"white",
+                flex:"1 1 300px", minWidth:0, background:"white",
                 border:".5px solid rgba(0,0,0,0.08)", borderRadius:16,
                 overflow:"hidden"}}
 
