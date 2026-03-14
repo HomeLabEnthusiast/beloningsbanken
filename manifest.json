@@ -1,6 +1,6 @@
 {
   "name": "Belöningsbanken",
-  "short_name": "Belöningen",
+  "short_name": "Belöningsbanken",
   "description": "Belöningssystem för barn – timer, poäng och rutiner",
   "start_url": "./index.html",
   "scope": "./",
