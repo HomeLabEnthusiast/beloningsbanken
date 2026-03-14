@@ -4019,6 +4019,7 @@ function SplitTimerView({kidList, updateChild, showToast, activities, activityCa
                   , React.createElement(HoldToStop, {
                       onStop: () => {
                         if (secs < 5) { showToast("⚡ För kort!"); return; }
+                        if (timerState.phase === "done") return; // guard repeat touch
                         setTimerState(p => ({...p, running:false, phase:"done"}));
                         const rawMins = Math.ceil(secs / 60);
                         const mins = (act && act.rewardType === "fixed" && act.fixedMinutes) ? act.fixedMinutes : rawMins;
