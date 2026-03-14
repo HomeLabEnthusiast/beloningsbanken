@@ -3812,6 +3812,7 @@ function SplitTimerView({kidList, updateChild, showToast, activities, activityCa
   const acts = allCatActs.length ? allCatActs : (activities && activities.length ? activities : DEFAULT_ACTIVITIES);
   const blank = {seconds:0, running:false, activity:acts[0], phase:"idle"};
   const [earnChoices, setEarnChoices] = React.useState({});
+  const firedKidsRef = React.useRef({});
 
   return (
     React.createElement('div', { style: {padding:"10px 8px 24px", maxWidth:1000, margin:"0 auto"}}
@@ -4019,7 +4020,8 @@ function SplitTimerView({kidList, updateChild, showToast, activities, activityCa
                   , React.createElement(HoldToStop, {
                       onStop: () => {
                         if (secs < 5) { showToast("⚡ För kort!"); return; }
-                        if (timerState.phase === "done") return; // guard repeat touch
+                        if (firedKidsRef.current[kid.id]) return; // guard repeat touch
+                        firedKidsRef.current[kid.id] = true;
                         setTimerState(p => ({...p, running:false, phase:"done"}));
                         const rawMins = Math.ceil(secs / 60);
                         const mins = (act && act.rewardType === "fixed" && act.fixedMinutes) ? act.fixedMinutes : rawMins;
@@ -4061,7 +4063,7 @@ function SplitTimerView({kidList, updateChild, showToast, activities, activityCa
                 minutes:ec.mins, date:new Date().toLocaleDateString("sv-SE")};
               updateChild(kid.id, {balance:kid.balance+ec.mins, history:[entry,...(kid.history||[])]});
               burst();
-              setEarnChoices(prev => { const n={...prev}; delete n[kid.id]; return n; });
+              setEarnChoices(prev => { const n={...prev}; delete n[kid.id]; return n; }); if(firedKidsRef && firedKidsRef.current) delete firedKidsRef.current[kid.id];
               setTimerStates(prev => ({...prev, [kid.id]: blank}));
               if (window._showVictory) {
                 window._showVictory({ child:kid, isReward:false,
@@ -4076,20 +4078,20 @@ function SplitTimerView({kidList, updateChild, showToast, activities, activityCa
                 minutes:0, points:pts, date:new Date().toLocaleDateString("sv-SE")};
               updateChild(kid.id, {points:(kid.points||0)+pts, history:[entry,...(kid.history||[])]});
               burst();
-              setEarnChoices(prev => { const n={...prev}; delete n[kid.id]; return n; });
+              setEarnChoices(prev => { const n={...prev}; delete n[kid.id]; return n; }); if(firedKidsRef && firedKidsRef.current) delete firedKidsRef.current[kid.id];
               setTimerStates(prev => ({...prev, [kid.id]: blank}));
             },
             onDismiss: () => {
-              setEarnChoices(prev => { const n={...prev}; delete n[kid.id]; return n; });
+              setEarnChoices(prev => { const n={...prev}; delete n[kid.id]; return n; }); if(firedKidsRef && firedKidsRef.current) delete firedKidsRef.current[kid.id];
               setTimerStates(prev => ({...prev, [kid.id]: blank}));
             },
             onHome: () => {
-              setEarnChoices(prev => { const n={...prev}; delete n[kid.id]; return n; });
+              setEarnChoices(prev => { const n={...prev}; delete n[kid.id]; return n; }); if(firedKidsRef && firedKidsRef.current) delete firedKidsRef.current[kid.id];
               setTimerStates(prev => ({...prev, [kid.id]: blank}));
               if (setView) setView("home");
             },
             onRestart: () => {
-              setEarnChoices(prev => { const n={...prev}; delete n[kid.id]; return n; });
+              setEarnChoices(prev => { const n={...prev}; delete n[kid.id]; return n; }); if(firedKidsRef && firedKidsRef.current) delete firedKidsRef.current[kid.id];
               setTimerStates(prev => ({...prev, [kid.id]: blank}));
             }
           });
