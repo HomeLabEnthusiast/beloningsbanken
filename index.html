@@ -7819,8 +7819,12 @@ function App() {
         background:"rgba(242,242,247,0.92)",
         backdropFilter:"blur(14px)",
         WebkitBackdropFilter:"blur(14px)",
-        padding:"0 20px", height:54,
-        display:"flex", alignItems:"center", justifyContent:"space-between",
+        paddingLeft:"max(20px, env(safe-area-inset-left))",
+        paddingRight:"max(20px, env(safe-area-inset-right))",
+        paddingTop:"env(safe-area-inset-top)",
+        height:"calc(54px + env(safe-area-inset-top))",
+        display:"flex", alignItems:"flex-end", justifyContent:"space-between",
+        paddingBottom:"8px",
         boxShadow:"0 .5px 0 rgba(0,0,0,0.12)",
         position:"sticky", top:0, zIndex:100}}
         , React.createElement('div', { style: {display:"flex",alignItems:"center",gap:10}}
