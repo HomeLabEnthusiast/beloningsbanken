@@ -59,6 +59,7 @@
       touch-action:none;
       -webkit-tap-highlight-color:transparent;
     }
+    @media(min-width:640px){.split-timer-grid{flex-direction:row!important;align-items:flex-start!important;}}
 
     .modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:200;
       display:flex;align-items:center;justify-content:center;padding:16px;}
@@ -3811,10 +3812,15 @@ function SplitTimerView({kidList, updateChild, showToast, activities, activityCa
   const acts = allCatActs.length ? allCatActs : (activities && activities.length ? activities : DEFAULT_ACTIVITIES);
   const blank = {seconds:0, running:false, activity:acts[0], phase:"idle"};
   const [earnChoices, setEarnChoices] = React.useState({});
+  const firedKidsRef = React.useRef({});
 
   return (
     React.createElement('div', { style: {padding:"10px 8px 24px", maxWidth:1000, margin:"0 auto"}}
-      , React.createElement('div', { style: {display:"flex", gap:10, alignItems:"flex-start", flexWrap:"wrap"}}
+      , React.createElement('div', { className:"split-timer-grid", style: {
+          display:"flex",
+          flexDirection:"column",
+          gap:12
+        }}
         , kidList.map((kid, kidIdx) => {
           const col = (() => { const t = getTheme(kid); return {bg:t.bg, border:t.border, accent:t.accent, chip:t.chip, chipText:t.chipText}; })();
           const timerState = timerStates[kid.id] || blank;
@@ -3846,7 +3852,7 @@ function SplitTimerView({kidList, updateChild, showToast, activities, activityCa
           if (hasNoActiveTimer) {
             return (
               React.createElement('div', { key: kid.id, style: {
-                  flex:"1 1 0", minWidth:0, background:"white",
+                  flex:"1 1 300px", minWidth:0, background:"white",
                   border:".5px solid rgba(0,0,0,0.08)", borderRadius:16,
                   overflow:"hidden", opacity:0.85}}
 
@@ -3890,7 +3896,7 @@ function SplitTimerView({kidList, updateChild, showToast, activities, activityCa
           /* ── ACTIVE card ── */
           return (
             React.createElement('div', { key: kid.id, style: {
-                flex:"1 1 0", minWidth:0, background:"white",
+                flex:"1 1 300px", minWidth:0, background:"white",
                 border:".5px solid rgba(0,0,0,0.08)", borderRadius:16,
                 overflow:"hidden"}}
 
@@ -4014,6 +4020,8 @@ function SplitTimerView({kidList, updateChild, showToast, activities, activityCa
                   , React.createElement(HoldToStop, {
                       onStop: () => {
                         if (secs < 5) { showToast("⚡ För kort!"); return; }
+                        if (firedKidsRef.current[kid.id]) return; // guard repeat touch
+                        firedKidsRef.current[kid.id] = true;
                         setTimerState(p => ({...p, running:false, phase:"done"}));
                         const rawMins = Math.ceil(secs / 60);
                         const mins = (act && act.rewardType === "fixed" && act.fixedMinutes) ? act.fixedMinutes : rawMins;
@@ -4055,7 +4063,7 @@ function SplitTimerView({kidList, updateChild, showToast, activities, activityCa
                 minutes:ec.mins, date:new Date().toLocaleDateString("sv-SE")};
               updateChild(kid.id, {balance:kid.balance+ec.mins, history:[entry,...(kid.history||[])]});
               burst();
-              setEarnChoices(prev => { const n={...prev}; delete n[kid.id]; return n; });
+              setEarnChoices(prev => { const n={...prev}; delete n[kid.id]; return n; }); if(firedKidsRef && firedKidsRef.current) delete firedKidsRef.current[kid.id];
               setTimerStates(prev => ({...prev, [kid.id]: blank}));
               if (window._showVictory) {
                 window._showVictory({ child:kid, isReward:false,
@@ -4070,20 +4078,20 @@ function SplitTimerView({kidList, updateChild, showToast, activities, activityCa
                 minutes:0, points:pts, date:new Date().toLocaleDateString("sv-SE")};
               updateChild(kid.id, {points:(kid.points||0)+pts, history:[entry,...(kid.history||[])]});
               burst();
-              setEarnChoices(prev => { const n={...prev}; delete n[kid.id]; return n; });
+              setEarnChoices(prev => { const n={...prev}; delete n[kid.id]; return n; }); if(firedKidsRef && firedKidsRef.current) delete firedKidsRef.current[kid.id];
               setTimerStates(prev => ({...prev, [kid.id]: blank}));
             },
             onDismiss: () => {
-              setEarnChoices(prev => { const n={...prev}; delete n[kid.id]; return n; });
+              setEarnChoices(prev => { const n={...prev}; delete n[kid.id]; return n; }); if(firedKidsRef && firedKidsRef.current) delete firedKidsRef.current[kid.id];
               setTimerStates(prev => ({...prev, [kid.id]: blank}));
             },
             onHome: () => {
-              setEarnChoices(prev => { const n={...prev}; delete n[kid.id]; return n; });
+              setEarnChoices(prev => { const n={...prev}; delete n[kid.id]; return n; }); if(firedKidsRef && firedKidsRef.current) delete firedKidsRef.current[kid.id];
               setTimerStates(prev => ({...prev, [kid.id]: blank}));
               if (setView) setView("home");
             },
             onRestart: () => {
-              setEarnChoices(prev => { const n={...prev}; delete n[kid.id]; return n; });
+              setEarnChoices(prev => { const n={...prev}; delete n[kid.id]; return n; }); if(firedKidsRef && firedKidsRef.current) delete firedKidsRef.current[kid.id];
               setTimerStates(prev => ({...prev, [kid.id]: blank}));
             }
           });
