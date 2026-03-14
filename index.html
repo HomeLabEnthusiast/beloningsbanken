@@ -3804,7 +3804,7 @@ function TimerView({child, updateChild, showToast, activities, activityCategorie
 }
 
 
-function SplitTimerView({kidList, updateChild, showToast, activities, activityCategories, timerStates, setTimerStates, setView, setActiveChild, setSplitSessionIds}) {
+function SplitTimerView({kidList, updateChild, showToast, activities, activityCategories, timerStates, setTimerStates, setView, setActiveChild, setSplitSessionIds, earnChoices, setEarnChoices}) {
   const cats = (activityCategories && activityCategories.length)
     ? activityCategories : DEFAULT_ACTIVITY_CATEGORIES;
   const allCatActs = cats.flatMap(c => (c.activities||[]).map(a => ({
@@ -3812,7 +3812,6 @@ function SplitTimerView({kidList, updateChild, showToast, activities, activityCa
   })));
   const acts = allCatActs.length ? allCatActs : (activities && activities.length ? activities : DEFAULT_ACTIVITIES);
   const blank = {seconds:0, running:false, activity:acts[0], phase:"idle"};
-  const [earnChoices, setEarnChoices] = React.useState({});
   const firedKidsRef = React.useRef({});
 
   return (
@@ -4040,69 +4039,12 @@ function SplitTimerView({kidList, updateChild, showToast, activities, activityCa
           );
         })
       )
+    )
+  );
+}
 
-      /* Per-child EarnChoiceDialog — rendered OUTSIDE the timer loop so second-ticks don't remount it */
-      , Object.keys(earnChoices).map(kidId => {
-          const ec = earnChoices[kidId];
-          const kid = kidList.find(k => k.id === kidId);
-          if (!ec || !kid) return null;
-          return React.createElement(EarnChoiceDialog, {
-            key: kidId+"_earn",
-            child: kid,
-            mins: ec.mins,
-            pointRatio: ec.pointRatio,
-            isFixed: ec.isFixed,
-            fixedPts: ec.fixedPts,
-            rewardType: ec.rewardType || "time",
-            actId: ec.actId,
-            actLabel: ec.actLabel,
-            actIcon: ec.actIcon,
-            updateChild: updateChild,
-            showToast: showToast,
-            onChooseTime: () => {
-              const entry = {id:Date.now()+Math.random(), activity:(ec.actId||"unknown"),
-                label:(ec.actLabel||"Aktivitet"), icon:(ec.actIcon||"⭐"),
-                minutes:ec.mins, date:new Date().toLocaleDateString("sv-SE")};
-              updateChild(kidId, {balance:kid.balance+ec.mins, history:[entry,...(kid.history||[])]});
-              burst();
-              setEarnChoices(prev => { const n={...prev}; delete n[kidId]; return n; });
-              if(firedKidsRef && firedKidsRef.current) delete firedKidsRef.current[kidId];
-              setTimerStates(prev => ({...prev, [kidId]: blank}));
-              if (window._showVictory) {
-                window._showVictory({ child:kid, isReward:false,
-                  activityEmoji: ec.actIcon||"⏱️",
-                  activityTitle: (ec.actLabel||"Aktivitet")+" klar!",
-                  earnedMins: ec.mins, earnedPoints:0, standalone:true });
-              }
-            },
-            onChoosePoints: (pts) => {
-              const entry = {id:Date.now()+Math.random(), activity:(ec.actId||"unknown"),
-                label:(ec.actLabel||"Aktivitet"), icon:(ec.actIcon||"⭐"),
-                minutes:0, points:pts, date:new Date().toLocaleDateString("sv-SE")};
-              updateChild(kidId, {points:(kid.points||0)+pts, history:[entry,...(kid.history||[])]});
-              burst();
-              setEarnChoices(prev => { const n={...prev}; delete n[kidId]; return n; });
-              if(firedKidsRef && firedKidsRef.current) delete firedKidsRef.current[kidId];
-              setTimerStates(prev => ({...prev, [kidId]: blank}));
-            },
-            onDismiss: () => {
-              setEarnChoices(prev => { const n={...prev}; delete n[kidId]; return n; });
-              if(firedKidsRef && firedKidsRef.current) delete firedKidsRef.current[kidId];
-              setTimerStates(prev => ({...prev, [kidId]: blank}));
-            },
-            onHome: () => {
-              setEarnChoices(prev => { const n={...prev}; delete n[kidId]; return n; });
-              if(firedKidsRef && firedKidsRef.current) delete firedKidsRef.current[kidId];
-              setTimerStates(prev => ({...prev, [kidId]: blank}));
-              if (setView) setView("home");
-            },
-            onRestart: () => {
-              setEarnChoices(prev => { const n={...prev}; delete n[kidId]; return n; });
-              if(firedKidsRef && firedKidsRef.current) delete firedKidsRef.current[kidId];
-              setTimerStates(prev => ({...prev, [kidId]: blank}));
-            }
-          });
-        })
+
+/* ═══════════════ HOLD TO STOP ══════════════════════════════════════════════ */
     )
   );
 }
@@ -7537,6 +7479,7 @@ function App() {
   const [victoryCard,   setVictoryCard]   = useState(null); // {emoji,title,lines:[]}
   const [adminUnlocked, setAdminUnlocked] = useState(false);
   const [routineFromSplit, setRoutineFromSplit] = useState(false);
+  const [splitEarnChoices, setSplitEarnChoices] = useState({});
   const toastTimer   = useRef(null);
   const victoryTimer = useRef(null);
 
@@ -7934,7 +7877,53 @@ function App() {
           activityCategories: (data.activityCategories && data.activityCategories.length) ? data.activityCategories : DEFAULT_ACTIVITY_CATEGORIES,
           timerStates: timerStates, setTimerStates: setTimerStates,
           setView: setView, setActiveChild: setActiveChild,
-          setSplitSessionIds: setSplitSessionIds})
+          setSplitSessionIds: setSplitSessionIds,
+          earnChoices: splitEarnChoices, setEarnChoices: setSplitEarnChoices})
+      )
+
+      /* Split earn dialogs rendered at App level — completely outside timer tick */
+      , Object.keys(splitEarnChoices).map(kidId => {
+          const ec = splitEarnChoices[kidId];
+          const kid = (data.children||[]).find(k => k.id === kidId);
+          if (!ec || !kid) return null;
+          const blank2 = {seconds:0, running:false, activity:null, phase:"idle"};
+          return React.createElement(EarnChoiceDialog, {
+            key: kidId+"_split_earn",
+            child: kid, mins: ec.mins, pointRatio: ec.pointRatio,
+            fixedPts: ec.fixedPts, rewardType: ec.rewardType || "time",
+            onChooseTime: () => {
+              const entry = {id:Date.now()+Math.random(), activity:(ec.actId||"unknown"),
+                label:(ec.actLabel||"Aktivitet"), icon:(ec.actIcon||"⭐"),
+                minutes:ec.mins, date:new Date().toLocaleDateString("sv-SE")};
+              updateChild(kidId, {balance:kid.balance+ec.mins, history:[entry,...(kid.history||[])]});
+              burst();
+              setSplitEarnChoices(prev => { const n={...prev}; delete n[kidId]; return n; });
+              setTimerStates(prev => ({...prev, [kidId]: blank2}));
+              if (window._showVictory) window._showVictory({ child:kid, isReward:false,
+                activityEmoji: ec.actIcon||"⏱️",
+                activityTitle: (ec.actLabel||"Aktivitet")+" klar!",
+                earnedMins: ec.mins, earnedPoints:0, standalone:true });
+            },
+            onChoosePoints: (pts) => {
+              const entry = {id:Date.now()+Math.random(), activity:(ec.actId||"unknown"),
+                label:(ec.actLabel||"Aktivitet"), icon:(ec.actIcon||"⭐"),
+                minutes:0, points:pts, date:new Date().toLocaleDateString("sv-SE")};
+              updateChild(kidId, {points:(kid.points||0)+pts, history:[entry,...(kid.history||[])]});
+              burst();
+              setSplitEarnChoices(prev => { const n={...prev}; delete n[kidId]; return n; });
+              setTimerStates(prev => ({...prev, [kidId]: blank2}));
+            },
+            onHome: () => {
+              setSplitEarnChoices(prev => { const n={...prev}; delete n[kidId]; return n; });
+              setTimerStates(prev => ({...prev, [kidId]: blank2}));
+              setView("home");
+            },
+            onRestart: () => {
+              setSplitEarnChoices(prev => { const n={...prev}; delete n[kidId]; return n; });
+              setTimerStates(prev => ({...prev, [kidId]: blank2}));
+            }
+          });
+        })
       )
       , effectiveView === "rewards" && (
         React.createElement(RewardsView, { child: child, updateChild: updateChild,
