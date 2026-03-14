@@ -2259,6 +2259,7 @@ function EarnChoiceDialog({child, mins, pointRatio, fixedPts, onChooseTime, onCh
     )
   );
 }
+EarnChoiceDialog = React.memo(EarnChoiceDialog);
 
 /* ═══════════════ ADMIN CHILD CARD ══════════════════════════════════════════ */
 function AdminChildCard({ child, data, openEdit, setDeleteId, deleteId, confirmDelete, adjustTime, adjustPoints, showToast, updateChild, getCats, setFamilyTarget }) {
@@ -4040,12 +4041,13 @@ function SplitTimerView({kidList, updateChild, showToast, activities, activityCa
         })
       )
 
-      /* Per-child EarnChoiceDialog */
-      , kidList.map(kid => {
-          const ec = earnChoices[kid.id];
-          if (!ec) return null;
+      /* Per-child EarnChoiceDialog — rendered OUTSIDE the timer loop so second-ticks don't remount it */
+      , Object.keys(earnChoices).map(kidId => {
+          const ec = earnChoices[kidId];
+          const kid = kidList.find(k => k.id === kidId);
+          if (!ec || !kid) return null;
           return React.createElement(EarnChoiceDialog, {
-            key: kid.id+"_earn",
+            key: kidId+"_earn",
             child: kid,
             mins: ec.mins,
             pointRatio: ec.pointRatio,
@@ -4061,10 +4063,11 @@ function SplitTimerView({kidList, updateChild, showToast, activities, activityCa
               const entry = {id:Date.now()+Math.random(), activity:(ec.actId||"unknown"),
                 label:(ec.actLabel||"Aktivitet"), icon:(ec.actIcon||"⭐"),
                 minutes:ec.mins, date:new Date().toLocaleDateString("sv-SE")};
-              updateChild(kid.id, {balance:kid.balance+ec.mins, history:[entry,...(kid.history||[])]});
+              updateChild(kidId, {balance:kid.balance+ec.mins, history:[entry,...(kid.history||[])]});
               burst();
-              setEarnChoices(prev => { const n={...prev}; delete n[kid.id]; return n; }); if(firedKidsRef && firedKidsRef.current) delete firedKidsRef.current[kid.id];
-              setTimerStates(prev => ({...prev, [kid.id]: blank}));
+              setEarnChoices(prev => { const n={...prev}; delete n[kidId]; return n; });
+              if(firedKidsRef && firedKidsRef.current) delete firedKidsRef.current[kidId];
+              setTimerStates(prev => ({...prev, [kidId]: blank}));
               if (window._showVictory) {
                 window._showVictory({ child:kid, isReward:false,
                   activityEmoji: ec.actIcon||"⏱️",
@@ -4076,23 +4079,27 @@ function SplitTimerView({kidList, updateChild, showToast, activities, activityCa
               const entry = {id:Date.now()+Math.random(), activity:(ec.actId||"unknown"),
                 label:(ec.actLabel||"Aktivitet"), icon:(ec.actIcon||"⭐"),
                 minutes:0, points:pts, date:new Date().toLocaleDateString("sv-SE")};
-              updateChild(kid.id, {points:(kid.points||0)+pts, history:[entry,...(kid.history||[])]});
+              updateChild(kidId, {points:(kid.points||0)+pts, history:[entry,...(kid.history||[])]});
               burst();
-              setEarnChoices(prev => { const n={...prev}; delete n[kid.id]; return n; }); if(firedKidsRef && firedKidsRef.current) delete firedKidsRef.current[kid.id];
-              setTimerStates(prev => ({...prev, [kid.id]: blank}));
+              setEarnChoices(prev => { const n={...prev}; delete n[kidId]; return n; });
+              if(firedKidsRef && firedKidsRef.current) delete firedKidsRef.current[kidId];
+              setTimerStates(prev => ({...prev, [kidId]: blank}));
             },
             onDismiss: () => {
-              setEarnChoices(prev => { const n={...prev}; delete n[kid.id]; return n; }); if(firedKidsRef && firedKidsRef.current) delete firedKidsRef.current[kid.id];
-              setTimerStates(prev => ({...prev, [kid.id]: blank}));
+              setEarnChoices(prev => { const n={...prev}; delete n[kidId]; return n; });
+              if(firedKidsRef && firedKidsRef.current) delete firedKidsRef.current[kidId];
+              setTimerStates(prev => ({...prev, [kidId]: blank}));
             },
             onHome: () => {
-              setEarnChoices(prev => { const n={...prev}; delete n[kid.id]; return n; }); if(firedKidsRef && firedKidsRef.current) delete firedKidsRef.current[kid.id];
-              setTimerStates(prev => ({...prev, [kid.id]: blank}));
+              setEarnChoices(prev => { const n={...prev}; delete n[kidId]; return n; });
+              if(firedKidsRef && firedKidsRef.current) delete firedKidsRef.current[kidId];
+              setTimerStates(prev => ({...prev, [kidId]: blank}));
               if (setView) setView("home");
             },
             onRestart: () => {
-              setEarnChoices(prev => { const n={...prev}; delete n[kid.id]; return n; }); if(firedKidsRef && firedKidsRef.current) delete firedKidsRef.current[kid.id];
-              setTimerStates(prev => ({...prev, [kid.id]: blank}));
+              setEarnChoices(prev => { const n={...prev}; delete n[kidId]; return n; });
+              if(firedKidsRef && firedKidsRef.current) delete firedKidsRef.current[kidId];
+              setTimerStates(prev => ({...prev, [kidId]: blank}));
             }
           });
         })
