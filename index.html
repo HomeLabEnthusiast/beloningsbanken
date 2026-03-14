@@ -30,7 +30,7 @@
     // Android Chrome: capture install prompt for custom button
     window._pwaInstallPrompt = null;
     window.addEventListener('beforeinstallprompt', e => {
-      e.preventDefault();
+      // Do NOT call e.preventDefault() — let the native prompt show automatically
       window._pwaInstallPrompt = e;
       document.dispatchEvent(new CustomEvent('pwa-installable'));
     });
