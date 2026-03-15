@@ -6417,7 +6417,8 @@ function SettingsView({data, setData, showToast, timerStates, setTimerStates, on
     // Lean snapshot for QR — excludes history to keep size small
     const today = new Date();
     const kids = (data.children||[]).map(c => ({
-      id:c.id, name:c.name, emoji:c.emoji, bg:c.bg,
+      id:c.id, name:c.name, emoji:c.emoji, bg:c.bg, theme:c.theme||null,
+      avatar:null, // excluded from QR — use file export
       balance:c.balance||0, points:c.points||0,
       history:[], // excluded from QR — use file export for full history
       targets:(c.targets||[]).map(t=>({...t,image:null})), // strip images
@@ -6437,7 +6438,7 @@ function SettingsView({data, setData, showToast, timerStates, setTimerStates, on
   const buildFullSnapshot = () => {
     const today = new Date();
     const kids = (data.children||[]).map(c => ({
-      id:c.id, name:c.name, emoji:c.emoji, bg:c.bg,
+      id:c.id, name:c.name, emoji:c.emoji, bg:c.bg, theme:c.theme||null, avatar:c.avatar||null,
       balance:c.balance||0, points:c.points||0,
       history:c.history||[], targets:c.targets||[],
       familyPoints:c.familyPoints||0, activeReward:c.activeReward||null
@@ -6598,13 +6599,14 @@ function SettingsView({data, setData, showToast, timerStates, setTimerStates, on
       _meta: {
         exportedAt:   today.toISOString(),
         exportedDate: dateStr,
-        version:      "v5",
+        version:      "v6",
         appName:      "Belöningsbanken"
       },
       children:    data.children    || [],
       activities:  data.activities  || [],
       activityCategories: data.activityCategories || [],
       rewards:     data.rewards     || [],
+      templates:   data.templates   || [],
       familyTarget: data.familyTarget || null,
       timerStates: timerStates      || {},
       _pin:        loadPin()        || null
@@ -6719,7 +6721,7 @@ function SettingsView({data, setData, showToast, timerStates, setTimerStates, on
           const doExport = () => {
             const today = new Date();
             const kids = (data.children||[]).map(c => {
-              let kid = {id:c.id,name:c.name,emoji:c.emoji,bg:c.bg,activeReward:c.activeReward||null};
+              let kid = {id:c.id,name:c.name,emoji:c.emoji,bg:c.bg,theme:c.theme||null,avatar:exportSel.bilder?(c.avatar||null):null,activeReward:c.activeReward||null};
               if (exportSel.tid)        { kid.balance=c.balance||0; kid.history=c.history||[]; }
               if (exportSel.poang)      { kid.points=c.points||0; }
               if (exportSel.mal)        { kid.targets=(c.targets||[]).map(t=>exportSel.bilder?t:{...t,image:null}); }
@@ -6930,10 +6932,12 @@ function SettingsView({data, setData, showToast, timerStates, setTimerStates, on
             if (k==="poang")       return !!(p.children&&p.children.some(c=>c.points>0));
             if (k==="mal")         return !!(p.children&&p.children.some(c=>c.targets&&c.targets.length));
             if (k==="familjemal")  return !!p.familyTarget;
-            if (k==="bilder")      return !!((p.familyTarget&&p.familyTarget.image)||(p.children&&p.children.some(c=>(c.targets||[]).some(t=>t.image))));
+            if (k==="bilder")      return !!((p.familyTarget&&p.familyTarget.image)||(p.children&&p.children.some(c=>c.avatar||(c.targets||[]).some(t=>t.image))));
             if (k==="aktiviteter") return !!(p.activities&&p.activities.length);
             if (k==="kategorier")  return !!(p.activityCategories&&p.activityCategories.length);
             if (k==="rewards")     return !!(p.rewards&&p.rewards.length);
+            if (k==="rutiner")     return !!(p.templates&&p.templates.length);
+            if (k==="timer")       return !!(p.timerStates&&Object.keys(p.timerStates).length);
             if (k==="pin")         return !!p._pin;
             return false;
           };
