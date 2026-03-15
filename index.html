@@ -5376,7 +5376,7 @@ function RoutineSplitView({kids, routineSessions, setRoutineSessions, updateChil
 }
 
 
-function RoutineRunner({child, session, onToggleRunning, onSkipStep, onUncheckStep, onCheckStep, onDone, onBack, onReturnToSplit, onAbort, hasOtherActiveSessions}) {
+function RoutineRunner({child, session, onToggleRunning, onSkipStep, onUncheckStep, onCheckStep, onDone, onBack, onReturnToSplit, onAbort, hasOtherActiveSessions, onEarlyFinish}) {
   const routine   = session.routine;
   const steps     = routine.steps || [];
   const stepIdx   = session.stepIdx;
@@ -5384,6 +5384,7 @@ function RoutineRunner({child, session, onToggleRunning, onSkipStep, onUncheckSt
   const running   = session.running;
   const done      = session.done;
   const completed = session.completed;
+  const [showSkipPicker, setShowSkipPicker] = React.useState(false);
 
   const currentStep = steps[stepIdx] || null;
 
@@ -5669,40 +5670,87 @@ function RoutineRunner({child, session, onToggleRunning, onSkipStep, onUncheckSt
           )
         )
 
-        /* ── En enda knapp ── */
+        /* ── Knappar ── */
         , React.createElement("div", {style:{padding:"0 0 16px"}}
+
+          /* Starta/Pausa + Hoppa (timer-steg) */
           , stepMode === "timer"
-            ? React.createElement("div", {style:{display:"flex", gap:8}}
+            ? React.createElement("div", {style:{display:"flex", gap:8, marginBottom:8}}
                 , React.createElement("button", {onClick: onToggleRunning,
                     style:{flex:1, background: running ? "#f59e0b" : cTheme.accent,
                       border:"none", borderRadius:12, padding:"14px",
                       color:"white", fontWeight:800, fontSize:15, cursor:"pointer"}},
                     running ? "⏸  Pausa" : (secs > 0 ? "▶  Fortsätt" : "▶  Starta"))
-                , React.createElement("button", {onClick: onSkipStep,
-                    style:{padding:"14px 16px", background:"#f2f2f7",
-                      border:".5px solid rgba(0,0,0,0.08)", borderRadius:12,
-                      cursor:"pointer", fontWeight:700, fontSize:13, color:"#6d6d72"}},
-                    stepIdx + 1 >= steps.length ? "Hoppa & avsluta" : "Hoppa →")
+                , React.createElement("button", {
+                    onClick: () => setShowSkipPicker(v=>!v),
+                    style:{padding:"14px 16px", background: showSkipPicker ? "#edeafb" : "#f2f2f7",
+                      border: showSkipPicker ? "1.5px solid #6c5cc8" : ".5px solid rgba(0,0,0,0.08)",
+                      borderRadius:12, cursor:"pointer", fontWeight:700, fontSize:13,
+                      color: showSkipPicker ? "#6c5cc8" : "#6d6d72"}},
+                    "Hoppa ▾")
               )
+
+          /* Klar-knapp (checklist/points-steg) */
             : (() => {
                 const allDone = completed.length === steps.length;
                 const isLast  = stepIdx + 1 >= steps.length;
-                // Last step not yet in completed — can finish directly
                 const lastStepDone = completed.includes(stepIdx);
                 const canFinish = allDone || (isLast && lastStepDone);
                 const blocked = isLast && !lastStepDone && !allDone;
-                return React.createElement("button", {
-                  onClick: blocked ? null : onSkipStep,
-                  disabled: blocked,
-                  style:{width:"100%",
-                    background: blocked ? "#f2f2f7" : cTheme.accent,
-                    border:"none", borderRadius:12, padding:"14px",
-                    color: blocked ? "#aeaeb2" : "white",
-                    fontWeight:800, fontSize:15,
-                    cursor: blocked ? "not-allowed" : "pointer"}},
-                  blocked ? "Bocka av i listan ovan"
-                  : isLast ? "✅  Klar & avsluta" : "✅  Klar!")
+                return React.createElement("div", {style:{marginBottom:8}}
+                  , React.createElement("button", {
+                      onClick: blocked ? null : onSkipStep,
+                      disabled: blocked,
+                      style:{width:"100%",
+                        background: blocked ? "#f2f2f7" : cTheme.accent,
+                        border:"none", borderRadius:12, padding:"14px",
+                        color: blocked ? "#aeaeb2" : "white",
+                        fontWeight:800, fontSize:15,
+                        cursor: blocked ? "not-allowed" : "pointer"}},
+                      blocked ? "Bocka av i listan ovan"
+                      : isLast ? "✅  Klar & avsluta" : "✅  Klar!")
+                );
               })()
+
+          /* Skip-väljare — vilken aktivitet ska hoppas? */
+          , showSkipPicker && React.createElement("div", {style:{
+              background:"white", border:".5px solid rgba(0,0,0,0.1)",
+              borderRadius:12, marginBottom:8, overflow:"hidden"}}
+            , React.createElement("div", {style:{fontSize:11, fontWeight:700, color:"#8e8e93",
+                letterSpacing:".06em", textTransform:"uppercase", padding:"10px 14px 6px"}},
+                "Välj aktivitet att hoppa över")
+            , steps.map((s, i) => {
+                if (completed.includes(i)) return null; // already done
+                const isCurrent = i === stepIdx;
+                return React.createElement("button", {key:i,
+                  onClick: () => { onSkipStep(i); setShowSkipPicker(false); },
+                  style:{
+                    width:"100%", display:"flex", alignItems:"center", gap:10,
+                    padding:"11px 14px",
+                    borderTop:".5px solid rgba(0,0,0,0.06)", background:"none",
+                    border:"none", cursor:"pointer", textAlign:"left",
+                    borderLeft: isCurrent ? `3px solid ${cTheme.accent}` : "3px solid transparent"}}
+                  , React.createElement("span", {style:{fontSize:18}}, s.icon||"⚡")
+                  , React.createElement("span", {style:{fontSize:13, fontWeight: isCurrent ? 700 : 500,
+                      color: isCurrent ? cTheme.accent : "#3c3c43", flex:1}}, s.label)
+                  , isCurrent && React.createElement("span", {style:{fontSize:10, color:cTheme.accent,
+                      fontWeight:700}}, "Nuvarande")
+                );
+              })
+          )
+
+          /* Avsluta rutin i förtid */
+          , completed.length > 0 && !done && React.createElement("button", {
+              onClick: () => {
+                if (onEarlyFinish) onEarlyFinish();
+              },
+              style:{
+                width:"100%", background:"none",
+                border:".5px solid rgba(0,0,0,0.1)", borderRadius:12,
+                padding:"11px 14px", cursor:"pointer",
+                display:"flex", alignItems:"center", justifyContent:"center", gap:8,
+                color:"#6d6d72", fontWeight:700, fontSize:13}},
+              "🏁 Avsluta rutin  (" + completed.length + "/" + steps.length + " klara)")
         )
       ) /* end body div */
     ) /* end card div */
@@ -8304,44 +8352,69 @@ function App() {
               [child.id]: {...s, completed: newCompleted, stepIdx: nextIdx, secs: 0, running: false}
             }));
           },
-          onSkipStep: () => {
+          onSkipStep: (skipIdx) => {
             const s = routineSessions[child.id];
             if (!s) return;
             const steps = s.routine.steps || [];
-            // Always add current step to completed
-            const newCompleted = s.completed.includes(s.stepIdx)
-              ? s.completed
-              : [...s.completed, s.stepIdx];
-            if (s.stepIdx + 1 >= steps.length) {
-              // finish — award points from newCompleted
+            const targetIdx = (skipIdx !== undefined) ? skipIdx : s.stepIdx;
+            // Mark targetIdx as skipped (add to completed so it counts, or just advance)
+            // For skip: do NOT add to completed — skip means no reward for that step
+            const newCompleted = s.completed.filter(i => i !== targetIdx);
+            // Find next uncompleted step after targetIdx
+            let nextIdx = targetIdx + 1;
+            while (nextIdx < steps.length && newCompleted.includes(nextIdx)) nextIdx++;
+            if (nextIdx >= steps.length) {
+              // No more steps — finish with what's completed
               const c = (data.children||[]).find(x=>x.id===child.id);
               if (c) {
-                const bonus     = newCompleted.length === steps.length ? (s.routine.bonus||0)    : 0;
-                const bonusMins = newCompleted.length === steps.length ? (s.routine.bonusMins||0) : 0;
-                const uniqueSkip   = [...new Set(newCompleted)];
-                const earnedMins   = uniqueSkip.reduce((a,i)=>{ const m=steps[i].mode||"timer"; return a+((m==="timer"||m==="tid")?(steps[i].minutes||0):0); },0);
-                const earnedPoints = uniqueSkip.reduce((a,i)=>{ const m=steps[i].mode||"timer"; return a+(m==="points"?(steps[i].points||0):0); },0);
-                const historyEntries = uniqueSkip.map(i=>({
+                const unique = [...new Set(newCompleted)];
+                const earnedMins   = unique.reduce((a,i)=>{ const m=steps[i].mode||"timer"; return a+((m==="timer"||m==="tid")?(steps[i].minutes||0):0); },0);
+                const earnedPoints = unique.reduce((a,i)=>{ const m=steps[i].mode||"timer"; return a+(m==="points"?(steps[i].points||0):0); },0);
+                const historyEntries = unique.map(i=>({
                   id:Date.now()+i+Math.random(), activity:steps[i].actId||steps[i].label,
                   label:steps[i].label, icon:steps[i].icon||"⚡",
                   minutes:(()=>{ const m=steps[i].mode||"timer"; return (m==="timer"||m==="tid") ? (steps[i].minutes||0) : 0; })(),
                   points: (()=>{ const m=steps[i].mode||"timer"; return m==="points" ? (steps[i].points||0) : 0; })(),
-                  mode: steps[i].mode||"timer",
-                  fromRoutine: true, routineName: s.routine.name||"Rutin",
+                  mode: steps[i].mode||"timer", fromRoutine:true, routineName:s.routine.name||"Rutin",
                   date:new Date().toLocaleDateString("sv-SE")
                 }));
                 updateChild(child.id, {
-                  balance:(c.balance||0)+earnedMins+bonusMins,
-                  points:(c.points||0)+earnedPoints+bonus,
+                  balance:(c.balance||0)+earnedMins,
+                  points:(c.points||0)+earnedPoints,
                   history:[...historyEntries,...(c.history||[])]
                 });
               }
               setRoutineSessions(ss => ({...ss, [child.id]: {...s, completed:newCompleted, done:true, running:false}}));
-              // Session will auto-clear via useEffect when no active sessions remain
             } else {
               setRoutineSessions(ss => ({...ss,
-                [child.id]: {...s, completed:newCompleted, stepIdx:s.stepIdx+1, secs:0, running:false}}));
+                [child.id]: {...s, completed:newCompleted, stepIdx:nextIdx, secs:0, running:false}}));
             }
+          },
+          onEarlyFinish: () => {
+            const s = routineSessions[child.id];
+            if (!s) return;
+            const steps = s.routine.steps || [];
+            const c = (data.children||[]).find(x=>x.id===child.id);
+            if (c) {
+              const unique = [...new Set(s.completed)];
+              const earnedMins   = unique.reduce((a,i)=>{ const m=steps[i].mode||"timer"; return a+((m==="timer"||m==="tid")?(steps[i].minutes||0):0); },0);
+              const earnedPoints = unique.reduce((a,i)=>{ const m=steps[i].mode||"timer"; return a+(m==="points"?(steps[i].points||0):0); },0);
+              const historyEntries = unique.map(i=>({
+                id:Date.now()+i+Math.random(), activity:steps[i].actId||steps[i].label,
+                label:steps[i].label, icon:steps[i].icon||"⚡",
+                minutes:(()=>{ const m=steps[i].mode||"timer"; return (m==="timer"||m==="tid") ? (steps[i].minutes||0) : 0; })(),
+                points: (()=>{ const m=steps[i].mode||"timer"; return m==="points" ? (steps[i].points||0) : 0; })(),
+                mode:steps[i].mode||"timer", fromRoutine:true, routineName:s.routine.name||"Rutin",
+                date:new Date().toLocaleDateString("sv-SE")
+              }));
+              updateChild(child.id, {
+                balance:(c.balance||0)+earnedMins,
+                points:(c.points||0)+earnedPoints,
+                history:[...historyEntries,...(c.history||[])]
+              });
+              showToast("🏁 Rutin avslutad — " + earnedMins + " min intjänade!");
+            }
+            setRoutineSessions(ss => ({...ss, [child.id]: {...s, completed:s.completed, done:true, running:false}}));
           },
           onDone: () => { setRoutineFromSplit(false); setRoutineSessions(s => { const n={...s}; delete n[child.id]; return n; }); setView("home"); },
           onBack: () => { setRoutineFromSplit(false); setView("home"); },
