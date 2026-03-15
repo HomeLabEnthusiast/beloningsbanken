@@ -239,14 +239,16 @@ const SESSION_KEY = "belöningsbanken_session";
 
 const saveSession = (routineSessions, timerStates, view, activeChild) => {
   try {
-    // Pause all running timers before saving — requires manual resume after reload
     const pausedRoutines = {};
     Object.entries(routineSessions).forEach(([id, s]) => {
       pausedRoutines[id] = s ? {...s, running: false} : s;
     });
     const pausedTimers = {};
     Object.entries(timerStates).forEach(([id, t]) => {
-      pausedTimers[id] = t ? {...t, running: false, phase: t.phase === "running" ? "paused" : t.phase} : t;
+      if (!t) return;
+      // Never persist phase:done — it would re-trigger EarnChoiceDialog on reload
+      const phase = t.phase === "running" ? "paused" : (t.phase === "done" ? "idle" : t.phase);
+      pausedTimers[id] = {...t, running: false, phase};
     });
     localStorage.setItem(SESSION_KEY, JSON.stringify({
       routineSessions: pausedRoutines,
@@ -6287,7 +6289,7 @@ function SettingsView({data, setData, showToast, timerStates, setTimerStates, on
       children:kids, activities:data.activities||[],
       activityCategories:data.activityCategories||[],
       rewards:data.rewards||[], familyTarget:data.familyTarget?{...data.familyTarget,image:null}:null,
-      templates:data.templates||[], timerStates:timerStates||{},
+      templates:data.templates||[], timerStates:Object.fromEntries(Object.entries(timerStates||{}).map(([id,t])=>[id,t?{...t,running:false,phase:t.phase==="done"?"idle":t.phase==="running"?"paused":t.phase}:t])),
       _pin:loadPin()||null
     };
   };
@@ -6305,7 +6307,7 @@ function SettingsView({data, setData, showToast, timerStates, setTimerStates, on
       children:kids, activities:data.activities||[],
       activityCategories:data.activityCategories||[],
       rewards:data.rewards||[], familyTarget:data.familyTarget||null,
-      templates:data.templates||[], timerStates:timerStates||{},
+      templates:data.templates||[], timerStates:Object.fromEntries(Object.entries(timerStates||{}).map(([id,t])=>[id,t?{...t,running:false,phase:t.phase==="done"?"idle":t.phase==="running"?"paused":t.phase}:t])),
       _pin:loadPin()||null
     };
   };
@@ -6465,7 +6467,7 @@ function SettingsView({data, setData, showToast, timerStates, setTimerStates, on
       rewards:     data.rewards     || [],
       templates:   data.templates   || [],
       familyTarget: data.familyTarget || null,
-      timerStates: timerStates      || {},
+      timerStates: Object.fromEntries(Object.entries(timerStates||{}).map(([id,t])=>[id,t?{...t,running:false,phase:t.phase==="done"?"idle":t.phase==="running"?"paused":t.phase}:t])),
       _pin:        loadPin()        || null
     };
 
@@ -6593,7 +6595,9 @@ function SettingsView({data, setData, showToast, timerStates, setTimerStates, on
             if (exportSel.familjemal)  snap.familyTarget       = exportSel.bilder?(data.familyTarget||null):(data.familyTarget?{...data.familyTarget,image:null}:null);
             if (exportSel.pin)     snap._pin        = loadPin()||null;
             if (exportSel.rutiner) snap.templates   = data.templates||[];
-            if (exportSel.timer)   snap.timerStates = timerStates||{};
+            if (exportSel.timer)   snap.timerStates = Object.fromEntries(
+              Object.entries(timerStates||{}).map(([id,t]) => [id, t ? {...t, running:false, phase: t.phase==="done"?"idle":t.phase==="running"?"paused":t.phase} : t])
+            );
             const blob = new Blob([JSON.stringify(snap,null,2)],{type:"application/json;charset=utf-8"});
             const url = URL.createObjectURL(blob);
             const a = document.createElement("a");
