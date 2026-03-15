@@ -3531,7 +3531,7 @@ function TimerView({child, updateChild, showToast, activities, activityCategorie
 
   const allCatActs = cats.flatMap(c => (c.activities||[]).map(a => ({
     ...a, color: a.color || c.color || "#f97316"
-  })));
+  }))).sort((a,b) => a.label.localeCompare(b.label, "sv"));
   const acts = allCatActs.length ? allCatActs : (activities || DEFAULT_ACTIVITIES);
 
   const blank = {seconds:0, running:false, activity:acts[0], phase:"idle"};
@@ -3607,7 +3607,9 @@ function TimerView({child, updateChild, showToast, activities, activityCategorie
 
   // Activities to show in left column: if category selected → that category's acts, else all acts (flat)
   const displayCats  = cats;
-  const displayActs  = selectedCategory ? (selectedCategory.activities || []) : [];
+  const displayActs  = selectedCategory
+    ? [...(selectedCategory.activities || [])].sort((a,b) => a.label.localeCompare(b.label, "sv"))
+    : [];
 
   return (
     React.createElement('div', { style: {maxWidth:540, margin:"0 auto", padding:"8px 8px 24px"}}
@@ -4226,7 +4228,7 @@ function SplitTimerView({kidList, updateChild, showToast, activities, activityCa
     ? activityCategories : DEFAULT_ACTIVITY_CATEGORIES;
   const allCatActs = cats.flatMap(c => (c.activities||[]).map(a => ({
     ...a, color: a.color || c.color || "#f97316"
-  })));
+  }))).sort((a,b) => a.label.localeCompare(b.label, "sv"));
   const acts = allCatActs.length ? allCatActs : (activities && activities.length ? activities : DEFAULT_ACTIVITIES);
   const blank = {seconds:0, running:false, activity:acts[0], phase:"idle"};
 
@@ -7031,11 +7033,10 @@ function SettingsView({data, setData, showToast, timerStates, setTimerStates, on
           /* ── View: list of categories ── */
           if (catAdminView === "list") return (
             React.createElement('div', { className: "fade-up"}
-              , React.createElement('div', {style:{display:"flex",alignItems:"center",
-                  justifyContent:"space-between",marginBottom:16}}
-                , React.createElement('div', {style:{fontFamily:"'Fredoka One',cursive",fontSize:20,color:"#6c5cc8"}},
-                    "🗂 Aktivitetskategorier"
-                  )
+              , React.createElement('div', {style:{display:"flex", alignItems:"center",
+                  justifyContent:"space-between", marginBottom:16}}
+                , React.createElement('div', {style:{fontSize:15, fontWeight:800, color:"#1c1c1e"}},
+                    "Aktivitetskategorier")
                 , React.createElement('button', {className:"btn-big",
                     onClick:()=>{ setEditCatFields({id:"cat"+Date.now(),label:"",icon:"🏠",color:"#c45c00",gradient:"linear-gradient(135deg,#fff7ed,#fef3c7)",border:"#fed7aa",activities:[]}); setCatAdminView("edit-cat"); },
                     style:{background:"#edeafb",border:".5px solid #d0caee",borderRadius:10,padding:"8px 14px",color:"#6c5cc8",fontWeight:800,fontSize:13,cursor:"pointer"}},
@@ -7072,17 +7073,17 @@ function SettingsView({data, setData, showToast, timerStates, setTimerStates, on
               )
               , React.createElement('div', {style:{background:"#ffffff",borderRadius:14,padding:16,border:".5px solid rgba(0,0,0,0.08)",display:"flex",flexDirection:"column",gap:14}}
                 , React.createElement('div', null
-                  , React.createElement('div', {style:{fontWeight:700,color:"#3c3c43",fontSize:12,marginBottom:8,letterSpacing:1}}, "IKON")
+                  , React.createElement('div', {style:{fontWeight:700,color:"#8e8e93",fontSize:11,marginBottom:8,letterSpacing:".06em",textTransform:"uppercase"}}, "Ikon")
                   , React.createElement('div', {style:{display:"flex",flexWrap:"wrap",gap:8}}
                     , CAT_ICONS.map(ic=> React.createElement('button', {key:ic,onClick:()=>setEditCatFields(f=>({...f,icon:ic})),style:{fontSize:24,width:44,height:44,borderRadius:10,cursor:"pointer",border:editCatFields.icon===ic?"2.5px solid #8b5cf6":"2px solid #e2e8f0",background:editCatFields.icon===ic?"#f5f3ff":"#f8fafc"}}, ic))
                   )
                 )
                 , React.createElement('div', null
-                  , React.createElement('div', {style:{fontWeight:700,color:"#3c3c43",fontSize:12,marginBottom:6,letterSpacing:1}}, "NAMN")
+                  , React.createElement('div', {style:{fontWeight:700,color:"#8e8e93",fontSize:11,marginBottom:6,letterSpacing:".06em",textTransform:"uppercase"}}, "Namn")
                   , React.createElement('input', {value:editCatFields.label,onChange:e=>setEditCatFields(f=>({...f,label:e.target.value})),placeholder:"T.ex. Hemma, Utomhus…",style:{width:"100%",border:".5px solid rgba(0,0,0,0.1)",borderRadius:10,padding:"10px 14px",fontSize:15,boxSizing:"border-box"}})
                 )
                 , React.createElement('div', null
-                  , React.createElement('div', {style:{fontWeight:700,color:"#3c3c43",fontSize:12,marginBottom:8,letterSpacing:1}}, "FÄRG")
+                  , React.createElement('div', {style:{fontWeight:700,color:"#8e8e93",fontSize:11,marginBottom:8,letterSpacing:".06em",textTransform:"uppercase"}}, "Färg")
                   , React.createElement('div', {style:{display:"flex",gap:8,flexWrap:"wrap"}}
                     , ACTIVITY_COLORS.map(c=> React.createElement('button', {key:c,onClick:()=>setEditCatFields(f=>({...f,color:c})),style:{width:34,height:34,borderRadius:10,background:c,cursor:"pointer",border:c===editCatFields.color?"3px solid #1e293b":"3px solid transparent"}}))
                   )
@@ -7098,7 +7099,65 @@ function SettingsView({data, setData, showToast, timerStates, setTimerStates, on
           /* ── View: edit activities within a category ── */
           if (catAdminView === "edit-acts" && activeCat) {
             const liveCat = getCats().find(c => c.id === activeCat.id) || activeCat;
-            const catActs = liveCat.activities || [];
+            // Sort alphabetically
+            const catActs = [...(liveCat.activities || [])].sort((a,b) => a.label.localeCompare(b.label, "sv"));
+
+            // Drag state — plain mutable object, no hooks inside IIFE
+            const dragState = {idx: null, over: null};
+
+            const handleDragStart = (i) => { dragState.idx = i; };
+            const handleDragEnter = (i) => { dragState.over = i; };
+            const handleDrop = () => {
+              if (dragState.idx === null || dragState.over === null || dragState.idx === dragState.over) return;
+              const newActs = [...catActs];
+              const [moved] = newActs.splice(dragState.idx, 1);
+              newActs.splice(dragState.over, 0, moved);
+              // Save back
+              const updatedCats = getCats().map(c => c.id === liveCat.id ? {...c, activities: newActs} : c);
+              setData(d => ({...d, activityCategories: updatedCats}));
+              dragState.idx = null; dragState.over = null;
+            };
+
+            const actFormFields = (isNew) => [
+              /* Ikon */
+              React.createElement('div', {key:"icon", style:{marginBottom:10}}
+                , React.createElement('div', {style:{fontWeight:700,color:"#8e8e93",fontSize:11,marginBottom:6,letterSpacing:".06em",textTransform:"uppercase"}}, "Ikon")
+                , React.createElement('div', {style:{display:"flex",flexWrap:"wrap",gap:6}}
+                  , ACT_ICONS.map(ic=> React.createElement('button', {key:ic,onClick:()=>setEditActInCat(a=>({...a,icon:ic})),style:{fontSize:18,width:36,height:36,borderRadius:8,cursor:"pointer",border:editActInCat.icon===ic?"2.5px solid "+(liveCat.color||"#8b5cf6"):"2px solid #e2e8f0",background:editActInCat.icon===ic?"#f5f3ff":"#f8fafc"}}, ic))
+                )
+              ),
+              /* Namn */
+              React.createElement('input', {key:"name", value:editActInCat.label,onChange:e=>setEditActInCat(a=>({...a,label:e.target.value})),placeholder:"Aktivitetsnamn",style:{width:"100%",border:".5px solid rgba(0,0,0,0.1)",borderRadius:9,padding:"9px 12px",fontSize:14,marginBottom:10,boxSizing:"border-box"}}),
+              /* Belöningstyp */
+              React.createElement('div', {key:"reward", style:{marginBottom:10}}
+                , React.createElement('div', {style:{fontWeight:700,color:"#8e8e93",fontSize:11,marginBottom:6,letterSpacing:".06em",textTransform:"uppercase"}}, "Belöningstyp")
+                , React.createElement('div', {style:{display:"flex",gap:8}}
+                  , [{val:"time",label:"⏱ Tidsbaserad"},{val:"fixed",label:"🎯 Fast tid"},{val:"fixedPoints",label:"⭐ Fast poäng"}].map(opt=>
+                      React.createElement('button', {key:opt.val,
+                        onClick:()=>setEditActInCat(a=>({...a,rewardType:opt.val})),
+                        style:{flex:1,padding:"8px",borderRadius:9,cursor:"pointer",fontWeight:700,fontSize:12,border:"none",
+                          background:(editActInCat.rewardType||"time")===opt.val?"#6c5cc8":"#f2f2f7",
+                          color:(editActInCat.rewardType||"time")===opt.val?"white":"#3c3c43"}},
+                        opt.label))
+                )
+                , (editActInCat.rewardType||"time")==="fixed" && React.createElement('div', {style:{display:"flex",alignItems:"center",gap:8,marginTop:8}}
+                  , React.createElement('span', {style:{fontSize:12,fontWeight:700,color:"#3c3c43"}}, "Fast tid:")
+                  , React.createElement('input', {type:"number",min:"1",max:"120",value:editActInCat.fixedMinutes||5,onChange:e=>setEditActInCat(a=>({...a,fixedMinutes:parseInt(e.target.value)||5})),style:{width:70,border:".5px solid rgba(0,0,0,0.1)",borderRadius:8,padding:"6px 10px",fontSize:14,fontWeight:700}})
+                  , React.createElement('span', {style:{fontSize:12,color:"#8e8e93"}}, "minuter")
+                )
+                , (editActInCat.rewardType||"time")==="fixedPoints" && React.createElement('div', {style:{display:"flex",alignItems:"center",gap:8,marginTop:8}}
+                  , React.createElement('span', {style:{fontSize:12,fontWeight:700,color:"#3c3c43"}}, "Fast poäng:")
+                  , React.createElement('input', {type:"number",min:"1",max:"500",value:editActInCat.fixedPoints||10,onChange:e=>setEditActInCat(a=>({...a,fixedPoints:parseInt(e.target.value)||10})),style:{width:70,border:".5px solid rgba(0,0,0,0.1)",borderRadius:8,padding:"6px 10px",fontSize:14,fontWeight:700}})
+                  , React.createElement('span', {style:{fontSize:12,color:"#8e8e93"}}, "poäng ⭐")
+                )
+              ),
+              /* Knappar */
+              React.createElement('div', {key:"btns", style:{display:"flex",gap:8}}
+                , React.createElement('button', {className:"btn-big",onClick:saveActInCat,style:{flex:1,background:"#6c5cc8",border:".5px solid #6c5cc8",borderRadius:9,padding:"9px",color:"white",fontWeight:800,fontSize:13,cursor:"pointer"}}, "Spara")
+                , React.createElement('button', {onClick:()=>setEditActInCat(null),style:{padding:"9px 14px",background:"rgba(0,0,0,0.04)",border:"none",borderRadius:9,cursor:"pointer",fontWeight:700,fontSize:13}}, "Avbryt")
+              )
+            ];
+
             return (
               React.createElement('div', { className: "fade-up"}
                 , React.createElement('div', {style:{display:"flex",alignItems:"center",gap:12,marginBottom:16}}
@@ -7106,136 +7165,52 @@ function SettingsView({data, setData, showToast, timerStates, setTimerStates, on
                   , React.createElement('span', {style:{fontSize:20}}, liveCat.icon)
                   , React.createElement('div', {style:{fontSize:15,fontWeight:800,color:"#1c1c1e"}}, liveCat.label)
                 )
-                /* Existing activities list — only edit-mode for existing acts */
+
+                , React.createElement('div', {style:{fontSize:11,color:"#8e8e93",fontWeight:600,marginBottom:8}},
+                    "Sorterade A–Ö  ·  Dra för att ändra ordning")
+
+                /* Activity list with drag & drop */
                 , catActs.map((act, ai) =>
-                    React.createElement('div', {key:act.id,style:{background:"#ffffff",borderRadius:12,padding:"10px 12px",marginBottom:6,border:".5px solid "+(editActInCat&&editActInCat.id===act.id?(liveCat.color||"#6c5cc8"):"rgba(0,0,0,0.08)")}}
-                      , editActInCat && editActInCat.id===act.id ? (
-                        React.createElement('div', {style:{background:"#ffffff",borderRadius:12,padding:"12px",marginBottom:6,border:".5px solid "+(liveCat.color||"#6c5cc8")}}
-                  , React.createElement('div', {style:{marginBottom:10}}
-                    , React.createElement('div', {style:{fontWeight:700,color:"#3c3c43",fontSize:11,marginBottom:6,letterSpacing:1}}, "IKON")
-                    , React.createElement('div', {style:{display:"flex",flexWrap:"wrap",gap:6}}
-                      , ACT_ICONS.map(ic=> React.createElement('button', {key:ic,onClick:()=>setEditActInCat(a=>({...a,icon:ic})),style:{fontSize:18,width:36,height:36,borderRadius:8,cursor:"pointer",border:editActInCat.icon===ic?"2.5px solid "+(liveCat.color||"#8b5cf6"):"2px solid #e2e8f0",background:editActInCat.icon===ic?"#f5f3ff":"#f8fafc"}}, ic))
-                    )
-                  )
-                  , React.createElement('input', {value:editActInCat.label,onChange:e=>setEditActInCat(a=>({...a,label:e.target.value})),placeholder:"Aktivitetsnamn",style:{width:"100%",border:".5px solid rgba(0,0,0,0.1)",borderRadius:9,padding:"9px 12px",fontSize:14,marginBottom:10,boxSizing:"border-box"}})
-                  , React.createElement('div', {style:{marginBottom:10}}
-                    , React.createElement('div', {style:{fontWeight:700,color:"#3c3c43",fontSize:11,marginBottom:6,letterSpacing:1}}, "SVÅRIGHETSGRAD")
-                    , React.createElement('div', {style:{display:"flex",gap:8}}
-                      , [1,2,3].map(d=> React.createElement('button', {key:d,onClick:()=>setEditActInCat(a=>({...a,difficulty:d,pointRatio:d===1?1:d===2?1.5:2.5})),style:{flex:1,padding:"8px",borderRadius:9,cursor:"pointer",fontWeight:800,fontSize:13,border:"none",background:editActInCat.difficulty===d?DIFF_COLORS[d]:"#f1f5f9",color:editActInCat.difficulty===d?"white":"#475569"}}, "⭐".repeat(d)+" "+DIFF_LABELS[d]))
-                    )
-                  )
+                    React.createElement('div', {key:act.id,
+                      draggable: !(editActInCat && editActInCat.id===act.id),
+                      onDragStart: ()=>handleDragStart(ai),
+                      onDragEnter: ()=>handleDragEnter(ai),
+                      onDragEnd: handleDrop,
+                      onDragOver: e=>e.preventDefault(),
+                      style:{background:"#ffffff",borderRadius:12,padding:"10px 12px",marginBottom:6,
+                        border:".5px solid "+(editActInCat&&editActInCat.id===act.id?(liveCat.color||"#6c5cc8"):"rgba(0,0,0,0.08)"),
+                        cursor:"grab"}}
 
-                  , React.createElement('div', {style:{marginBottom:10}}
-                    , React.createElement('div', {style:{fontWeight:700,color:"#3c3c43",fontSize:11,marginBottom:6,letterSpacing:1}}, "BELÖNINGSTYP")
-                    , React.createElement('div', {style:{display:"flex",gap:8}}
-                      , [{val:"time",label:"\u23f1 Tidsbaserad"},{val:"fixed",label:"\u{1f3af} Fast tid"},{val:"fixedPoints",label:"\u2b50 Fast po\xe4ng"}].map(opt=>
-                          React.createElement('button', {key:opt.val,
-                            onClick:()=>setEditActInCat(a=>({...a,rewardType:opt.val})),
-                            style:{flex:1,padding:"8px",borderRadius:9,cursor:"pointer",fontWeight:800,fontSize:12,border:"none",
-                              background:(editActInCat.rewardType||"time")===opt.val?"#0d9488":"#f1f5f9",
-                              color:(editActInCat.rewardType||"time")===opt.val?"white":"#475569"}},
-                            opt.label))
-                    )
-                    , (editActInCat.rewardType||"time")==="fixed" && React.createElement('div', {style:{display:"flex",alignItems:"center",gap:8,marginTop:8}}
-                      , React.createElement('span', {style:{fontSize:12,fontWeight:700,color:"#3c3c43"}}, "Fast tid:")
-                      , React.createElement('input', {type:"number",min:"1",max:"120",
-                          value:editActInCat.fixedMinutes||5,
-                          onChange:e=>setEditActInCat(a=>({...a,fixedMinutes:parseInt(e.target.value)||5})),
-                          style:{width:70,border:".5px solid rgba(0,0,0,0.1)",borderRadius:8,padding:"6px 10px",fontSize:14,fontWeight:700}})
-                      , React.createElement('span', {style:{fontSize:12,color:"#8e8e93"}}, "minuter")
-                    )
-                    , (editActInCat.rewardType||"time")==="fixedPoints" && React.createElement('div', {style:{display:"flex",alignItems:"center",gap:8,marginTop:8}}
-                      , React.createElement('span', {style:{fontSize:12,fontWeight:700,color:"#3c3c43"}}, "Fast poäng:")
-                      , React.createElement('input', {type:"number",min:"1",max:"500",
-                          value:editActInCat.fixedPoints||10,
-                          onChange:e=>setEditActInCat(a=>({...a,fixedPoints:parseInt(e.target.value)||10})),
-                          style:{width:70,border:".5px solid rgba(0,0,0,0.1)",borderRadius:8,padding:"6px 10px",fontSize:14,fontWeight:700}})
-                      , React.createElement('span', {style:{fontSize:12,color:"#8e8e93"}}, "poäng ⭐")
-                    )
-                  )
-                  , React.createElement('div', {style:{display:"flex",gap:8}}
-                    , React.createElement('button', {className:"btn-big",onClick:saveActInCat,style:{flex:1,background:"#6c5cc8",border:".5px solid #6c5cc8",borderRadius:9,padding:"9px",color:"white",fontWeight:800,fontSize:13,cursor:"pointer"}}, "Spara")
-                    , React.createElement('button', {onClick:()=>setEditActInCat(null),style:{padding:"9px 14px",background:"rgba(0,0,0,0.04)",border:"none",borderRadius:9,cursor:"pointer",fontWeight:700,fontSize:13}}, "Avbryt")
-                  )
-                )
-                      ) : (
-                        React.createElement('div', null
-                          , React.createElement('div', {style:{display:"flex",alignItems:"center",gap:10}}
-                            , React.createElement('span', {style:{fontSize:24}}, act.icon)
-                            , React.createElement('div', {style:{flex:1}}
-                              , React.createElement('div', {style:{fontWeight:800,color:"#1c1c1e",fontSize:14}}, act.label)
-                              , React.createElement('div', {style:{display:"flex",gap:6,marginTop:2,alignItems:"center"}}
-                                , React.createElement('span', {style:{fontSize:10,color:DIFF_COLORS[act.difficulty||1],fontWeight:800,background:"rgba(0,0,0,0.04)",borderRadius:50,padding:"2px 7px"}}, "⭐".repeat(act.difficulty||1)+" "+DIFF_LABELS[act.difficulty||1])
-                                , React.createElement('span', {style:{fontSize:10,color:"#8e8e93",fontWeight:700}}, "×"+(act.pointRatio||1)+" poäng")
+                      , editActInCat && editActInCat.id===act.id
+                        ? React.createElement('div', null, ...actFormFields(false))
+                        : React.createElement('div', null
+                            , React.createElement('div', {style:{display:"flex",alignItems:"center",gap:10}}
+                              , React.createElement('span', {style:{fontSize:16,color:"#c7c7cc",flexShrink:0,cursor:"grab"}}, "⠿")
+                              , React.createElement('span', {style:{fontSize:22}}, act.icon)
+                              , React.createElement('div', {style:{flex:1}}
+                                , React.createElement('div', {style:{fontWeight:800,color:"#1c1c1e",fontSize:14}}, act.label)
+                                , React.createElement('div', {style:{fontSize:11,color:"#8e8e93",marginTop:2}},
+                                    act.rewardType==="fixed" ? "Fast "+act.fixedMinutes+" min"
+                                    : act.rewardType==="fixedPoints" ? "Fast "+act.fixedPoints+" poäng"
+                                    : "Tidsbaserad")
                               )
+                              , React.createElement('button', {className:"btn-big",onClick:()=>setEditActInCat({...act}),style:{background:"rgba(59,130,246,0.08)",border:"none",borderRadius:9,padding:"7px 10px",color:"#3b82f6",fontWeight:700,fontSize:12,cursor:"pointer"}}, "✏️")
+                              , React.createElement('button', {className:"btn-big",onClick:()=>setDeleteActInCat(deleteActInCat===act.id?null:act.id),style:{background:"#fee2e2",border:"none",borderRadius:9,padding:"7px 10px",color:"#c0392b",fontWeight:700,fontSize:12,cursor:"pointer"}}, "🗑")
                             )
-                            , React.createElement('div', {style:{display:"flex",flexDirection:"column",gap:2,flexShrink:0}}
-                              , React.createElement('button', {onClick:()=>moveAct(act.id,-1),disabled:ai===0,style:{background:"rgba(0,0,0,0.04)",border:"none",borderRadius:6,width:26,height:22,cursor:ai===0?"default":"pointer",fontSize:11,opacity:ai===0?0.3:1}}, "▲")
-                              , React.createElement('button', {onClick:()=>moveAct(act.id,1),disabled:ai===catActs.length-1,style:{background:"rgba(0,0,0,0.04)",border:"none",borderRadius:6,width:26,height:22,cursor:ai===catActs.length-1?"default":"pointer",fontSize:11,opacity:ai===catActs.length-1?0.3:1}}, "▼")
-                            )
-                            , React.createElement('button', {className:"btn-big",onClick:()=>setEditActInCat({...act}),style:{background:"rgba(59,130,246,0.08)",border:"none",borderRadius:9,padding:"7px 10px",color:"#3b82f6",fontWeight:700,fontSize:12,cursor:"pointer"}}, "✏️")
-                            , React.createElement('button', {className:"btn-big",onClick:()=>setDeleteActInCat(deleteActInCat===act.id?null:act.id),style:{background:"#fee2e2",border:"none",borderRadius:9,padding:"7px 10px",color:"#c0392b",fontWeight:700,fontSize:12,cursor:"pointer"}}, "🗑")
+                            , deleteActInCat===act.id && React.createElement(DeleteConfirm, {label:act.label,onConfirm:()=>confirmDeleteActInCat(act.id),onCancel:()=>setDeleteActInCat(null)})
                           )
-                          , deleteActInCat===act.id && React.createElement(DeleteConfirm, {label:act.label,onConfirm:()=>confirmDeleteActInCat(act.id),onCancel:()=>setDeleteActInCat(null)})
-                        )
-                      )
                     )
                   )
 
-                /* New activity form — rendered OUTSIDE map so new ids work */
+                /* New activity form */
                 , editActInCat && !catActs.find(a=>a.id===editActInCat.id) && (
                   React.createElement('div', {style:{background:"#ffffff",borderRadius:12,padding:"12px",marginBottom:6,border:".5px solid "+(liveCat.color||"#6c5cc8")}}
-                  , React.createElement('div', {style:{marginBottom:10}}
-                    , React.createElement('div', {style:{fontWeight:700,color:"#3c3c43",fontSize:11,marginBottom:6,letterSpacing:1}}, "IKON")
-                    , React.createElement('div', {style:{display:"flex",flexWrap:"wrap",gap:6}}
-                      , ACT_ICONS.map(ic=> React.createElement('button', {key:ic,onClick:()=>setEditActInCat(a=>({...a,icon:ic})),style:{fontSize:18,width:36,height:36,borderRadius:8,cursor:"pointer",border:editActInCat.icon===ic?"2.5px solid "+(liveCat.color||"#8b5cf6"):"2px solid #e2e8f0",background:editActInCat.icon===ic?"#f5f3ff":"#f8fafc"}}, ic))
-                    )
-                  )
-                  , React.createElement('input', {value:editActInCat.label,onChange:e=>setEditActInCat(a=>({...a,label:e.target.value})),placeholder:"Aktivitetsnamn",style:{width:"100%",border:".5px solid rgba(0,0,0,0.1)",borderRadius:9,padding:"9px 12px",fontSize:14,marginBottom:10,boxSizing:"border-box"}})
-                  , React.createElement('div', {style:{marginBottom:10}}
-                    , React.createElement('div', {style:{fontWeight:700,color:"#3c3c43",fontSize:11,marginBottom:6,letterSpacing:1}}, "SVÅRIGHETSGRAD")
-                    , React.createElement('div', {style:{display:"flex",gap:8}}
-                      , [1,2,3].map(d=> React.createElement('button', {key:d,onClick:()=>setEditActInCat(a=>({...a,difficulty:d,pointRatio:d===1?1:d===2?1.5:2.5})),style:{flex:1,padding:"8px",borderRadius:9,cursor:"pointer",fontWeight:800,fontSize:13,border:"none",background:editActInCat.difficulty===d?DIFF_COLORS[d]:"#f1f5f9",color:editActInCat.difficulty===d?"white":"#475569"}}, "⭐".repeat(d)+" "+DIFF_LABELS[d]))
-                    )
-                  )
-
-                  , React.createElement('div', {style:{marginBottom:10}}
-                    , React.createElement('div', {style:{fontWeight:700,color:"#3c3c43",fontSize:11,marginBottom:6,letterSpacing:1}}, "BELÖNINGSTYP")
-                    , React.createElement('div', {style:{display:"flex",gap:8}}
-                      , [{val:"time",label:"\u23f1 Tidsbaserad"},{val:"fixed",label:"\u{1f3af} Fast tid"},{val:"fixedPoints",label:"\u2b50 Fast po\xe4ng"}].map(opt=>
-                          React.createElement('button', {key:opt.val,
-                            onClick:()=>setEditActInCat(a=>({...a,rewardType:opt.val})),
-                            style:{flex:1,padding:"8px",borderRadius:9,cursor:"pointer",fontWeight:800,fontSize:12,border:"none",
-                              background:(editActInCat.rewardType||"time")===opt.val?"#0d9488":"#f1f5f9",
-                              color:(editActInCat.rewardType||"time")===opt.val?"white":"#475569"}},
-                            opt.label))
-                    )
-                    , (editActInCat.rewardType||"time")==="fixed" && React.createElement('div', {style:{display:"flex",alignItems:"center",gap:8,marginTop:8}}
-                      , React.createElement('span', {style:{fontSize:12,fontWeight:700,color:"#3c3c43"}}, "Fast tid:")
-                      , React.createElement('input', {type:"number",min:"1",max:"120",
-                          value:editActInCat.fixedMinutes||5,
-                          onChange:e=>setEditActInCat(a=>({...a,fixedMinutes:parseInt(e.target.value)||5})),
-                          style:{width:70,border:".5px solid rgba(0,0,0,0.1)",borderRadius:8,padding:"6px 10px",fontSize:14,fontWeight:700}})
-                      , React.createElement('span', {style:{fontSize:12,color:"#8e8e93"}}, "minuter")
-                    )
-                    , (editActInCat.rewardType||"time")==="fixedPoints" && React.createElement('div', {style:{display:"flex",alignItems:"center",gap:8,marginTop:8}}
-                      , React.createElement('span', {style:{fontSize:12,fontWeight:700,color:"#3c3c43"}}, "Fast poäng:")
-                      , React.createElement('input', {type:"number",min:"1",max:"500",
-                          value:editActInCat.fixedPoints||10,
-                          onChange:e=>setEditActInCat(a=>({...a,fixedPoints:parseInt(e.target.value)||10})),
-                          style:{width:70,border:".5px solid rgba(0,0,0,0.1)",borderRadius:8,padding:"6px 10px",fontSize:14,fontWeight:700}})
-                      , React.createElement('span', {style:{fontSize:12,color:"#8e8e93"}}, "poäng ⭐")
-                    )
-                  )
-                  , React.createElement('div', {style:{display:"flex",gap:8}}
-                    , React.createElement('button', {className:"btn-big",onClick:saveActInCat,style:{flex:1,background:"#6c5cc8",border:".5px solid #6c5cc8",borderRadius:9,padding:"9px",color:"white",fontWeight:800,fontSize:13,cursor:"pointer"}}, "Spara")
-                    , React.createElement('button', {onClick:()=>setEditActInCat(null),style:{padding:"9px 14px",background:"rgba(0,0,0,0.04)",border:"none",borderRadius:9,cursor:"pointer",fontWeight:700,fontSize:13}}, "Avbryt")
+                    , React.createElement('div', null, ...actFormFields(true))
                   )
                 )
-                )
 
-                /* Add button — hidden while form is open */
-                , !editActInCat && React.createElement('button', {className:"btn-big",onClick:()=>setEditActInCat({id:"act"+Date.now(),label:"",icon:"⭐",difficulty:1,pointRatio:1}),style:{width:"100%",background:"#edeafb",border:".5px solid #d0caee",borderRadius:12,padding:"11px",color:"#6c5cc8",fontWeight:800,fontSize:13,cursor:"pointer",marginTop:4}}, "+ Ny aktivitet i "+liveCat.label)
+                /* Add button */
+                , !editActInCat && React.createElement('button', {className:"btn-big",onClick:()=>setEditActInCat({id:"act"+Date.now(),label:"",icon:"⭐",rewardType:"time",pointRatio:1}),style:{width:"100%",background:"#edeafb",border:".5px solid #d0caee",borderRadius:12,padding:"11px",color:"#6c5cc8",fontWeight:800,fontSize:13,cursor:"pointer",marginTop:4}}, "+ Ny aktivitet i "+liveCat.label)
               )
             );
           }
