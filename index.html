@@ -154,14 +154,37 @@ const needsDarkText = (hex) => {
 
 const getTheme = (child) => {
   if (child.bg && !CHILD_THEMES.find(t => t.bg === child.bg)) {
-    const bg = child.bg;
+    const hex = child.bg.replace('#','');
+    const r = parseInt(hex.slice(0,2),16);
+    const g = parseInt(hex.slice(2,4),16);
+    const b = parseInt(hex.slice(4,6),16);
+    // Accent for UI elements — darken 30%
+    const dr = Math.round(r*0.7), dg = Math.round(g*0.7), db = Math.round(b*0.7);
+    const accent = '#'+[dr,dg,db].map(v=>v.toString(16).padStart(2,'0')).join('');
+    // UI bg tint — very light (mix 15% of color with white)
+    const tr = Math.round(r*0.15+255*0.85);
+    const tg = Math.round(g*0.15+255*0.85);
+    const tb = Math.round(b*0.15+255*0.85);
+    const bgTint = '#'+[tr,tg,tb].map(v=>v.toString(16).padStart(2,'0')).join('');
+    // Chip bg — slightly more color (25%)
+    const cr = Math.round(r*0.25+255*0.75);
+    const cg = Math.round(g*0.25+255*0.75);
+    const cb2 = Math.round(b*0.25+255*0.75);
+    const chip = '#'+[cr,cg,cb2].map(v=>v.toString(16).padStart(2,'0')).join('');
     return {
-      bg, border:bg, accent:bg, text:"white", chip:bg, chipText:"white",
-      headerText:"white", headerTextSub:"rgba(255,255,255,0.8)"
+      headerBg: child.bg,     // header background only — used via cTheme.headerBg||cTheme.accent → we override below
+      bg: bgTint,             // very light tint for UI elements (rows, chips bg)
+      border: chip,
+      accent,                 // darker shade for text, borders, progress
+      text: accent,
+      chip,
+      chipText: accent,
+      headerText: "white",
+      headerTextSub: "rgba(255,255,255,0.8)"
     };
   }
   const t = CHILD_THEMES.find(t => t.id === child.theme) || CHILD_THEMES[0];
-  return { ...t, headerText:"white", headerTextSub:"rgba(255,255,255,0.8)" };
+  return { ...t, headerBg: t.accent, headerText:"white", headerTextSub:"rgba(255,255,255,0.8)" };
 };
 
 const DEFAULT_ACTIVITIES = [
@@ -2317,7 +2340,7 @@ function AdminChildCard({ child, data, openEdit, setDeleteId, deleteId, confirmD
     /* ── Full-bleed accent header ── */
     , React.createElement('div', {
         style:{
-          background: cTheme.accent,
+          background: cTheme.headerBg||cTheme.accent,
           padding:"12px 14px",
           display:"flex", alignItems:"center", gap:12}}
 
@@ -2780,24 +2803,27 @@ function HomeView({data, setData, setView, setActiveChild, showToast, showVictor
             .map(id => (data.children||[]).find(c => c.id === id))
             .filter(Boolean);
           if (activeRKids.length < 2) return null;
-          return React.createElement('div', {style:{
-              background:"linear-gradient(135deg,#f5f3ff,#ede9fe)",
-              border:"2px solid #ddd6fe", borderRadius:16,
-              padding:"12px 16px", marginBottom:16,
-              display:"flex", alignItems:"center", gap:10}}
-            , React.createElement('span', {style:{fontSize:22}}, "⚡")
+          return React.createElement('div', {
+            onClick: () => setView("routine"),
+            style:{
+              margin:"0 0 8px",
+              background:"white",
+              border:".5px solid rgba(0,0,0,0.08)",
+              borderLeft:"3px solid #6c5cc8",
+              borderRadius:"0 12px 12px 0",
+              padding:"11px 14px",
+              display:"flex", alignItems:"center", gap:12,
+              cursor:"pointer",
+              boxShadow:"0 1px 4px rgba(0,0,0,0.06)"}}
+            , React.createElement('span', {style:{fontSize:20, flexShrink:0}}, "⚡")
             , React.createElement('div', {style:{flex:1}}
-              , React.createElement('div', {style:{fontFamily:"'Fredoka One',cursive",
-                  fontSize:15,color:"#5b4bb0"}}, "Aktiva rutiner pågår")
-              , React.createElement('div', {style:{fontSize:12,color:"#8e8e93",fontWeight:700}},
+              , React.createElement('div', {style:{fontSize:13, fontWeight:800, color:"#1c1c1e", marginBottom:2}},
+                  "Rutiner pågår!")
+              , React.createElement('div', {style:{fontSize:12, color:"#8e8e93", fontWeight:600}},
                   activeRKids.map(k=>k.emoji+" "+k.name).join(" · "))
             )
-            , React.createElement('button', {
-                onClick:()=>setView("routine"),
-                style:{background:"linear-gradient(135deg,#6c5cc8,#8b7fd4)",
-                  border:"none",borderRadius:10,padding:"8px 14px",color:"white",
-                  fontWeight:800,fontSize:13,cursor:"pointer"}},
-                "Visa översikt →")
+            , React.createElement('span', {style:{fontSize:12, fontWeight:700, color:"#6c5cc8"}},
+                "Öppna →")
           );
         })()
 
@@ -2875,7 +2901,7 @@ function HomeView({data, setData, setView, setActiveChild, showToast, showVictor
 
               /* ── Full-bleed colored header ── */
               , React.createElement('div', { style: {
-                  background: isDebt ? "#b91c1c" : cTheme.accent,
+                  background: isDebt ? "#b91c1c" : (cTheme.headerBg||cTheme.accent),
                   padding: "18px 16px 38px",
                   position: "relative"
                 }}
@@ -3595,7 +3621,7 @@ function TimerView({child, updateChild, showToast, activities, activityCategorie
 
         /* ── Child header ── */
         , React.createElement('div', { style: {
-            background: cTheme.accent,
+            background: cTheme.headerBg||cTheme.accent,
             padding: "14px 14px 16px",
             display: "flex", alignItems: "center", gap: 10}}
 
@@ -3994,7 +4020,7 @@ function SplitKidCard({kid, timerState, setTimerState, acts, showToast, updateCh
         border:".5px solid rgba(0,0,0,0.08)", borderRadius:16,
         overflow:"hidden", opacity:0.85}}
       , React.createElement('div', { style: {
-          background: col.accent, padding:"14px 14px 16px",
+          background: col.headerBg||col.accent, padding:"14px 14px 16px",
           display:"flex", alignItems:"center", gap:10}}
         , React.createElement('div', { style: {
             width:40, height:40, borderRadius:"50%", flexShrink:0,
@@ -4034,7 +4060,7 @@ function SplitKidCard({kid, timerState, setTimerState, acts, showToast, updateCh
         overflow:"hidden"}}
 
       , React.createElement('div', { style: {
-          background: col.accent, padding:"14px 14px 16px",
+          background: col.headerBg||col.accent, padding:"14px 14px 16px",
           display:"flex", alignItems:"center", gap:10}}
         , React.createElement('div', { style: {
             width:40, height:40, borderRadius:"50%", flexShrink:0,
@@ -5109,7 +5135,7 @@ function RoutineSplitView({kids, routineSessions, setRoutineSessions, updateChil
           flex:"1 1 300px", minWidth:0, display:"flex", flexDirection:"column"}}
 
         /* full-bleed header */
-        , React.createElement("div", {style:{background: cTheme.accent, padding:"14px 14px 16px",
+        , React.createElement("div", {style:{background: cTheme.headerBg||cTheme.accent, padding:"14px 14px 16px",
             display:"flex", alignItems:"center", gap:10}}
           , React.createElement("div", {style:{width:44,height:44,borderRadius:"50%",flexShrink:0,
               background:"rgba(255,255,255,0.2)",border:"2px solid rgba(255,255,255,0.5)",
@@ -5188,7 +5214,7 @@ function RoutineSplitView({kids, routineSessions, setRoutineSessions, updateChil
         flex:"1 1 300px", minWidth:0, display:"flex", flexDirection:"column"}}
 
       /* ── Full-bleed header ── */
-      , React.createElement("div", {style:{background: cTheme.accent, padding:"14px 14px 16px",
+      , React.createElement("div", {style:{background: cTheme.headerBg||cTheme.accent, padding:"14px 14px 16px",
           display:"flex", alignItems:"center", gap:10}}
         , React.createElement("div", {style:{width:44,height:44,borderRadius:"50%",flexShrink:0,
             background:"rgba(255,255,255,0.2)",border:"2px solid rgba(255,255,255,0.5)",
@@ -5490,7 +5516,7 @@ function RoutineRunner({child, session, onToggleRunning, onSkipStep, onUncheckSt
 
       /* ── Full-bleed header ── */
       , React.createElement("div", {style:{
-          background: cTheme.accent, padding:"14px 14px 16px",
+          background: cTheme.headerBg||cTheme.accent, padding:"14px 14px 16px",
           display:"flex", alignItems:"center", gap:10}}
         , React.createElement("div", {style:{
             width:44, height:44, borderRadius:"50%", flexShrink:0,
