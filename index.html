@@ -111,7 +111,25 @@ const { useState, useEffect, useRef } = React;
 
 /* ─── CONSTANTS ─────────────────────────────────────────────────────────── */
 const EMOJIS    = ["🦁","🐸","🦊","🐼","🦋","🐬","🦄","🐉","🐨","🐯","🐻","🦖","🐧","🦒","🦓","🐙"];
-const BG_COLORS = ["#fef3c7","#d1fae5","#dbeafe","#fce7f3","#ede9fe","#ffedd5","#f0fdf4","#e0f2fe"];
+const BG_COLORS = [
+  // Röd-Orange-Guld
+  "#ac1917","#b75420","#c0982b",
+  "#d70e17","#e46828","#f0be39",
+  "#e54a50","#ea8553","#eec76b",
+  // Grön-Teal
+  "#768b45","#237f5d","#1c7873",
+  "#93ae55","#359d73","#27958f",
+  "#a9be77","#6fb293","#4eaaa6",
+  // Blå-Lila
+  "#156b8a","#3f5d82","#704776",
+  "#1887ab","#4f73a1","#8c5792",
+  "#5d9db9","#728fb4","#926ca0",
+  // Lila-Rosa
+  "#874f80","#a15284","#aa3653",
+  "#a9629f","#c867a5","#d34467",
+  "#b881b1","#d386b7","#dc6986",
+];
+
 
 /* ─── V2 THEME PALETTE ──────────────────────────────────────────────────── */
 const CHILD_THEMES = [
@@ -124,7 +142,27 @@ const CHILD_THEMES = [
   { id:"orange", label:"Amber",  bg:"#fef3e0", border:"#f8dca0", accent:"#c47a00", text:"#7a4c00", chip:"#fce8b0", chipText:"#7a4c00" },
   { id:"pink",   label:"Lavendel",bg:"#f0ecfb", border:"#d8cef4", accent:"#7c5cb8", text:"#4a3480", chip:"#e4dcf8", chipText:"#4a3480" },
 ];
-const getTheme = (child) => CHILD_THEMES.find(t => t.id === child.theme) || CHILD_THEMES[0];
+// Returns true if color is light enough to need dark text
+const needsDarkText = (hex) => {
+  const h = hex.replace('#','');
+  const r = parseInt(h.slice(0,2),16)/255;
+  const g = parseInt(h.slice(2,4),16)/255;
+  const b = parseInt(h.slice(4,6),16)/255;
+  const lum = 0.299*r + 0.587*g + 0.114*b;
+  return lum > 0.55;
+};
+
+const getTheme = (child) => {
+  if (child.bg && !CHILD_THEMES.find(t => t.bg === child.bg)) {
+    const bg = child.bg;
+    return {
+      bg, border:bg, accent:bg, text:"white", chip:bg, chipText:"white",
+      headerText:"white", headerTextSub:"rgba(255,255,255,0.8)"
+    };
+  }
+  const t = CHILD_THEMES.find(t => t.id === child.theme) || CHILD_THEMES[0];
+  return { ...t, headerText:"white", headerTextSub:"rgba(255,255,255,0.8)" };
+};
 
 const DEFAULT_ACTIVITIES = [
   { id:"reading",  label:"Läsning",  icon:"📚", color:"#1a9464", pointRatio:1 },
@@ -2266,115 +2304,138 @@ function AdminChildCard({ child, data, openEdit, setDeleteId, deleteId, confirmD
   const [showAdj, setShowAdj] = React.useState(false);
   const [showTargets, setShowTargets] = React.useState(false);
 
+  const cTheme  = getTheme(child);
   const hist     = child.history || [];
   const totalMin = hist.reduce((s,h)=>s+(h.minutes||0),0);
   const today    = new Date().toLocaleDateString("sv-SE");
-  const todayMin = hist.filter(h=>h.date===today).reduce((s,h)=>s+(h.minutes||0),0);
+  const isDebt   = child.balance < 0;
 
   return React.createElement('div', {
-    style:{background:"white",borderRadius:16,marginBottom:10,
-      boxShadow:"none",
-      border:".5px solid rgba(0,0,0,0.08)",
-      overflow:"hidden"}}
+    style:{background:"white", borderRadius:16, marginBottom:10,
+      border:".5px solid rgba(0,0,0,0.08)", overflow:"hidden"}}
 
-    /* ── Clickable header ── */
+    /* ── Full-bleed accent header ── */
     , React.createElement('div', {
-        onClick: () => setOpen(o=>!o),
-        style:{display:"flex",alignItems:"center",gap:14,padding:"14px 18px",
-          cursor:"pointer",userSelect:"none",
-          background: open ? (child.bg||"#fff8f0") : "white",
-          transition:"background 0.2s"}}
-      , React.createElement('span', {style:{fontSize:38,lineHeight:1}}, child.emoji)
-      , React.createElement('div', {style:{flex:1}}
-        , React.createElement('div', {style:{fontFamily:"'Fredoka One',cursive",fontSize:20,color:"#1c1c1e",lineHeight:1.1}},
-            child.name
-          )
-        , React.createElement('div', {style:{fontSize:12,fontWeight:700,marginTop:3,
-            color: child.balance < 0 ? "#ef4444" : "#f97316",
-            display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}},
-            child.balance < 0
+        style:{
+          background: cTheme.accent,
+          padding:"12px 14px",
+          display:"flex", alignItems:"center", gap:12}}
+
+      /* Avatar — clickable to toggle */
+      , React.createElement('div', {
+          onClick: () => setOpen(o=>!o),
+          style:{
+            width:42, height:42, borderRadius:"50%", flexShrink:0,
+            background:"rgba(255,255,255,0.2)",
+            border:"2px solid rgba(255,255,255,0.5)",
+            display:"flex", alignItems:"center", justifyContent:"center",
+            fontSize:22, cursor:"pointer", overflow:"hidden"}},
+        child.avatar
+          ? React.createElement('img', {src:child.avatar, style:{width:"100%",height:"100%",objectFit:"cover"}})
+          : child.emoji)
+
+      /* Name + stats — clickable to toggle */
+      , React.createElement('div', {
+          onClick: () => setOpen(o=>!o),
+          style:{flex:1, minWidth:0, cursor:"pointer"}}
+        , React.createElement('div', {style:{fontSize:16, fontWeight:800, color:cTheme.headerText||"white", letterSpacing:"-.2px", lineHeight:1.1}},
+            child.name)
+        , React.createElement('div', {style:{fontSize:11, color:cTheme.headerTextSub||"rgba(255,255,255,0.8)", fontWeight:600, marginTop:2}},
+            isDebt
               ? "😬 Skuld: " + Math.abs(child.balance) + " min"
-              : "🪙 " + child.balance + " min · " + totalMin + " min totalt"
-            , React.createElement('span', {style:{color:"#6c5cc8",fontWeight:700}},
-                "⭐ " + (child.points||0) + " poäng"
-              )
+              : "⏱ " + child.balance + " min  ·  ⭐ " + (child.points||0) + " poäng"
           )
       )
-      /* Quick stats pill */
-      , React.createElement('div', {style:{display:"flex",alignItems:"center",gap:8}}
-        , React.createElement('span', {style:{fontSize:14,color:"#8e8e93",
-            display:"inline-block",
-            transform: open ? "rotate(180deg)" : "rotate(0deg)",
-            transition:"transform 0.2s"}}, "▾")
+
+      /* Action buttons in header */
+      , React.createElement('div', {style:{display:"flex", alignItems:"center", gap:6, flexShrink:0}}
+        , React.createElement('button', {
+            className:"btn-big",
+            onClick: (e) => { e.stopPropagation(); openEdit(child); },
+            style:{
+              background:"rgba(255,255,255,0.2)", border:"1px solid rgba(255,255,255,0.35)",
+              borderRadius:8, padding:"5px 10px",
+              color:cTheme.headerText||"white", fontWeight:700, fontSize:11,
+              cursor:"pointer", whiteSpace:"nowrap"}},
+          "✏️ Redigera")
+        /* Chevron */
+        , React.createElement('div', {
+            onClick: () => setOpen(o=>!o),
+            style:{
+              cursor:"pointer", padding:"4px",
+              fontSize:14, color:cTheme.headerTextSub||"rgba(255,255,255,0.8)",
+              display:"inline-block",
+              transform: open ? "rotate(180deg)" : "rotate(0deg)",
+              transition:"transform 0.2s"}}, "▾")
       )
     )
 
     /* ── Expanded content ── */
-    , open && React.createElement('div', {style:{padding:"0 18px 18px",borderTop:"1.5px solid #f1f5f9"}}
-
-      /* Edit / Delete buttons */
-      , React.createElement('div', {style:{display:"flex",gap:8,marginTop:14,marginBottom:14}}
-        , React.createElement('button', {className:"btn-big", onClick:()=>openEdit(child),
-            style:{flex:1,background:"#dbeafe",border:"none",borderRadius:10,padding:"9px",
-              cursor:"pointer",fontWeight:700,color:"#3b82f6",fontSize:13}}, "✏️ Redigera")
-        , React.createElement('button', {className:"btn-big", onClick:()=>setDeleteId(child.id),
-            style:{flex:1,background:"#fee2e2",border:"none",borderRadius:10,padding:"9px",
-              cursor:"pointer",fontWeight:700,color:"#ef4444",fontSize:13}}, "🗑 Radera")
-      )
-
-      /* Delete confirmation */
-      , deleteId===child.id && React.createElement('div', {style:{marginBottom:14}}
-        , React.createElement(DeleteConfirm, {
-            label: child.name,
-            onConfirm: ()=>confirmDelete(child.id),
-            onCancel: ()=>setDeleteId(null)})
-      )
+    , open && React.createElement('div', {style:{padding:"14px 16px 18px"}}
 
       /* Time + Points adjuster */
-      , React.createElement('div', {style:{marginBottom:14}}
+      , React.createElement('div', {style:{marginBottom:10}}
         , React.createElement('button', {
             onClick: () => setShowAdj(s => !s),
-            style:{width:"100%",background:"#f2f2f7",border:".5px solid rgba(0,0,0,0.1)",
-              borderRadius:12,padding:"11px 16px",cursor:"pointer",
-              display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom: showAdj ? 10 : 0}}
-          , React.createElement('span', {style:{fontFamily:"'Fredoka One',cursive",fontSize:15,color:"#3c3c43"}}, "🎛 Justera min & poäng")
-          , React.createElement('span', {style:{fontSize:13,color:"#8e8e93",
+            style:{
+              width:"100%", background:"white",
+              border:".5px solid rgba(0,0,0,0.08)",
+              borderRadius:12, padding:"10px 14px", cursor:"pointer",
+              display:"flex", alignItems:"center", justifyContent:"space-between"}}
+          , React.createElement('div', {style:{display:"flex", alignItems:"center", gap:8}}
+            , React.createElement('div', {style:{
+                width:28, height:28, borderRadius:8,
+                background: cTheme.accent+"18",
+                display:"flex", alignItems:"center", justifyContent:"center", fontSize:14}}, "🎛")
+            , React.createElement('span', {style:{fontSize:13, fontWeight:700, color:"#1c1c1e"}}, "Justera min & poäng")
+          )
+          , React.createElement('span', {style:{fontSize:13, color:"#8e8e93",
               display:"inline-block",
               transform: showAdj ? "rotate(180deg)" : "rotate(0deg)",
               transition:"transform 0.2s"}}, "▾")
         )
-        , showAdj && React.createElement('div', {style:{display:"flex",flexWrap:"wrap",gap:10}}
-          , React.createElement('div', {style:{flex:"1 1 200px",background:"#f2f2f7",borderRadius:12,padding:"10px 12px",border:".5px solid rgba(0,0,0,0.1)"}}
+        , showAdj && React.createElement('div', {style:{display:"flex", flexWrap:"wrap", gap:10, marginTop:10}}
+          , React.createElement('div', {style:{flex:"1 1 200px", background:"#f2f2f7", borderRadius:12, padding:"10px 12px", border:".5px solid rgba(0,0,0,0.06)"}}
             , React.createElement(ChildTimeAdjuster, {child:child, onAdjust:adjustTime, label:"⏱ MIN", color:"#1a9464"})
           )
-          , React.createElement('div', {style:{flex:"1 1 200px",background:"#f5f3ff",borderRadius:12,padding:"10px 12px",border:"1.5px solid #ddd6fe"}}
+          , React.createElement('div', {style:{flex:"1 1 200px", background:"#f5f3ff", borderRadius:12, padding:"10px 12px", border:".5px solid rgba(108,92,200,0.15)"}}
             , React.createElement(ChildTimeAdjuster, {child:child, onAdjust:adjustPoints, label:"⭐ POÄNG", color:"#6c5cc8"})
           )
         )
       )
 
       /* Targets */
-      , React.createElement('div', {style:{marginBottom:14}}
+      , React.createElement('div', {style:{marginBottom:10}}
         , React.createElement('button', {
             onClick: () => setShowTargets(s => !s),
-            style:{width:"100%",background:"#f2f2f7",border:".5px solid rgba(0,0,0,0.1)",
-              borderRadius:12,padding:"11px 16px",cursor:"pointer",
-              display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom: showTargets ? 10 : 0}}
-          , React.createElement('span', {style:{fontFamily:"'Fredoka One',cursive",fontSize:15,color:"#5b4bb0"}}, "🎯 Mål")
-          , React.createElement('span', {style:{fontSize:13,color:"#8e8e93",
+            style:{
+              width:"100%", background:"white",
+              border:".5px solid rgba(0,0,0,0.08)",
+              borderRadius:12, padding:"10px 14px", cursor:"pointer",
+              display:"flex", alignItems:"center", justifyContent:"space-between"}}
+          , React.createElement('div', {style:{display:"flex", alignItems:"center", gap:8}}
+            , React.createElement('div', {style:{
+                width:28, height:28, borderRadius:8,
+                background: cTheme.accent+"18",
+                display:"flex", alignItems:"center", justifyContent:"center", fontSize:14}}, "🎯")
+            , React.createElement('span', {style:{fontSize:13, fontWeight:700, color:"#1c1c1e"}}, "Mål")
+          )
+          , React.createElement('span', {style:{fontSize:13, color:"#8e8e93",
               display:"inline-block",
               transform: showTargets ? "rotate(180deg)" : "rotate(0deg)",
               transition:"transform 0.2s"}}, "▾")
         )
-        , showTargets && React.createElement(TargetsView, {
-            child: child,
-            updateChild: (id, updates) => updateChild(id, updates),
-            showToast: showToast,
-            isInline: true,
-            familyTarget: data.familyTarget || null,
-            setFamilyTarget: setFamilyTarget,
-            allChildren: data.children || []
-          })
+        , showTargets && React.createElement('div', {style:{marginTop:10}}
+          , React.createElement(TargetsView, {
+              child: child,
+              updateChild: (id, updates) => updateChild(id, updates),
+              showToast: showToast,
+              isInline: true,
+              familyTarget: data.familyTarget || null,
+              setFamilyTarget: setFamilyTarget,
+              allChildren: data.children || []
+            })
+        )
       )
 
       /* History */
@@ -2822,18 +2883,18 @@ function HomeView({data, setData, setView, setActiveChild, showToast, showVictor
                 /* Name + status row */
                 , React.createElement('div', { style: {display:"flex", alignItems:"flex-start", justifyContent:"space-between"}}
                   , React.createElement('div', null
-                    , React.createElement('div', { style: {fontSize:22, fontWeight:800, color:"white", letterSpacing:"-.4px", lineHeight:1}}, child.name)
+                    , React.createElement('div', { style: {fontSize:22, fontWeight:800, color:cTheme.headerText||"white", letterSpacing:"-.4px", lineHeight:1}}, child.name)
                     , hasActiveTimer
                       ? React.createElement('div', { style: {display:"flex", alignItems:"center", gap:5, marginTop:5}}
                           , React.createElement('div', { style: {width:7, height:7, borderRadius:"50%",
                               background: ts.phase === "running" ? "#4ade80" : "#fbbf24",
                               animation: ts.phase === "running" ? "pulse 1.4s ease infinite" : "none", flexShrink:0}})
-                          , React.createElement('span', { style: {fontSize:12, fontWeight:600, color:"rgba(255,255,255,0.85)"}},
+                          , React.createElement('span', { style: {fontSize:12, fontWeight:600, color:cTheme.headerTextSub||"rgba(255,255,255,0.85)"}},
                               ts.phase === "running" ? "Aktiv nu" : "Pausad")
                         )
                       : isDebt
-                        ? React.createElement('div', { style: {fontSize:12, fontWeight:600, color:"rgba(255,255,255,0.85)", marginTop:5}}, "Skuld!")
-                        : React.createElement('div', { style: {fontSize:12, color:"rgba(255,255,255,0.6)", marginTop:5, fontWeight:500}}, "Redo att jobba")
+                        ? React.createElement('div', { style: {fontSize:12, fontWeight:600, color:cTheme.headerTextSub||"rgba(255,255,255,0.85)", marginTop:5}}, "Skuld!")
+                        : React.createElement('div', { style: {fontSize:12, color:cTheme.headerTextSub||"rgba(255,255,255,0.6)", marginTop:5, fontWeight:500}}, "Redo att jobba")
                   )
 
                   /* Avatar + live timer */
@@ -2852,9 +2913,11 @@ function HomeView({data, setData, setView, setActiveChild, showToast, showVictor
                           background:"rgba(255,255,255,0.2)",
                           border:"2.5px solid rgba(255,255,255,0.5)",
                           display:"flex", alignItems:"center", justifyContent:"center",
-                          fontSize:26, flexShrink:0
+                          fontSize:26, flexShrink:0, overflow:"hidden"
                         }}
-                      , child.emoji
+                      , child.avatar
+                          ? React.createElement('img', {src:child.avatar, style:{width:"100%",height:"100%",objectFit:"cover"}})
+                          : child.emoji
                     )
                   )
                 )
@@ -3802,6 +3865,336 @@ function TimerView({child, updateChild, showToast, activities, activityCategorie
 }
 
 
+/* Collapsed color picker using BG_COLORS — used by both add and edit forms */
+function AddColorPicker({value, onChange}) {
+  const [open, setOpen] = React.useState(false);
+  const GROUPS = [
+    { label:"Röd · Orange · Guld", colors:["#ac1917","#b75420","#c0982b","#d70e17","#e46828","#f0be39","#e54a50","#ea8553","#eec76b"] },
+    { label:"Grön · Teal",         colors:["#768b45","#237f5d","#1c7873","#93ae55","#359d73","#27958f","#a9be77","#6fb293","#4eaaa6"] },
+    { label:"Blå · Lila",          colors:["#156b8a","#3f5d82","#704776","#1887ab","#4f73a1","#8c5792","#5d9db9","#728fb4","#926ca0"] },
+    { label:"Lila · Rosa",         colors:["#874f80","#a15284","#aa3653","#a9629f","#c867a5","#d34467","#b881b1","#d386b7","#dc6986"] },
+  ];
+  return React.createElement('div', {style:{border:".5px solid rgba(0,0,0,0.1)", borderRadius:12, overflow:"hidden"}}
+    , React.createElement('div', {
+        onClick: () => setOpen(v=>!v),
+        style:{display:"flex", alignItems:"center", justifyContent:"space-between",
+          padding:"10px 14px", background:"#f8f7f5", cursor:"pointer"}}
+      , React.createElement('div', {style:{display:"flex", alignItems:"center", gap:10}}
+        , React.createElement('div', {style:{
+            width:26, height:26, borderRadius:8,
+            background: value, border:".5px solid rgba(0,0,0,0.12)", flexShrink:0}})
+        , React.createElement('span', {style:{fontSize:12, color:"#3c3c43", fontWeight:600}}, "Välj färg")
+      )
+      , React.createElement('span', {style:{fontSize:13, color:"#8e8e93", display:"inline-block",
+          transform: open?"rotate(180deg)":"rotate(0deg)", transition:"transform 0.2s"}}, "▾")
+    )
+    , open && React.createElement('div', {style:{background:"white", paddingBottom:8}}
+      , GROUPS.map(g =>
+          React.createElement('div', {key:g.label}
+            , React.createElement('div', {style:{fontSize:10, fontWeight:700, color:"#8e8e93",
+                letterSpacing:".06em", textTransform:"uppercase", padding:"8px 12px 4px"}}, g.label)
+            , React.createElement('div', {style:{display:"flex", gap:5, padding:"0 12px 4px"}}
+              , g.colors.map(c =>
+                  React.createElement('button', {key:c, onClick:()=>{ onChange(c); setOpen(false); },
+                    style:{
+                      flex:1, height:34, borderRadius:8, cursor:"pointer",
+                      background:c,
+                      border: c===value ? "3px solid white" : "1px solid rgba(0,0,0,0.1)",
+                      boxSizing:"border-box",
+                      boxShadow: c===value ? "0 0 0 2px #1c1c1e" : "none"}})
+                )
+            )
+          )
+        )
+    )
+  );
+}
+
+/* Collapsed emoji picker for add-child form */
+function AddEmojiPicker({value, onChange}) {
+  const [open, setOpen] = React.useState(false);
+  return React.createElement('div', {style:{border:".5px solid rgba(0,0,0,0.1)", borderRadius:12, overflow:"hidden"}}
+    , React.createElement('div', {
+        onClick: () => setOpen(v=>!v),
+        style:{display:"flex", alignItems:"center", justifyContent:"space-between",
+          padding:"10px 14px", background:"#f8f7f5", cursor:"pointer"}}
+      , React.createElement('div', {style:{display:"flex", alignItems:"center", gap:10}}
+        , React.createElement('span', {style:{fontSize:26}}, value)
+        , React.createElement('span', {style:{fontSize:12, color:"#3c3c43", fontWeight:600}}, "Välj emoji")
+      )
+      , React.createElement('span', {style:{fontSize:13, color:"#8e8e93", display:"inline-block",
+          transform: open?"rotate(180deg)":"rotate(0deg)", transition:"transform 0.2s"}}, "▾")
+    )
+    , open && React.createElement('div', {style:{display:"grid", gridTemplateColumns:"repeat(8,1fr)", gap:2, padding:8, background:"white"}}
+      , EMOJIS.map(e=>
+          React.createElement('button', {key:e, onClick:()=>{ onChange(e); setOpen(false); },
+            style:{fontSize:22, background:e===value?"#edeafb":"transparent",
+              border:e===value?"2px solid #6c5cc8":"2px solid transparent",
+              borderRadius:8, padding:"5px 0", cursor:"pointer", lineHeight:1, textAlign:"center"}}, e)
+        )
+    )
+  );
+}
+
+/* Collapsed theme picker for add-child form */
+function AddThemePicker({value, onChange}) {
+  const [open, setOpen] = React.useState(false);
+  const cur = CHILD_THEMES.find(t=>t.id===value)||CHILD_THEMES[0];
+  return React.createElement('div', {style:{border:".5px solid rgba(0,0,0,0.1)", borderRadius:12, overflow:"hidden"}}
+    , React.createElement('div', {
+        onClick: () => setOpen(v=>!v),
+        style:{display:"flex", alignItems:"center", justifyContent:"space-between",
+          padding:"10px 14px", background:"#f8f7f5", cursor:"pointer"}}
+      , React.createElement('div', {style:{display:"flex", alignItems:"center", gap:10}}
+        , React.createElement('div', {style:{
+            width:26, height:26, borderRadius:8,
+            background:cur.bg, border:`.5px solid ${cur.accent}40`, flexShrink:0}})
+        , React.createElement('span', {style:{fontSize:12, color:"#3c3c43", fontWeight:600}}, cur.label||"Välj tema")
+      )
+      , React.createElement('span', {style:{fontSize:13, color:"#8e8e93", display:"inline-block",
+          transform: open?"rotate(180deg)":"rotate(0deg)", transition:"transform 0.2s"}}, "▾")
+    )
+    , open && React.createElement('div', {style:{display:"grid", gridTemplateColumns:"repeat(6,1fr)", gap:6, padding:10, background:"white"}}
+      , CHILD_THEMES.map(t=>
+          React.createElement('button', {key:t.id, onClick:()=>{ onChange(t.id); setOpen(false); },
+            title:t.label,
+            style:{
+              height:36, borderRadius:10, cursor:"pointer",
+              background:t.bg,
+              border:t.id===value?`3px solid ${t.accent}`:"1px solid rgba(0,0,0,0.08)",
+              boxSizing:"border-box"}})
+        )
+    )
+  );
+}
+
+function SplitKidCard({kid, timerState, setTimerState, acts, showToast, updateChild, setView, setSplitSessionIds}) {
+  const col = (() => { const t = getTheme(kid); return {bg:t.bg, border:t.border, accent:t.accent, chip:t.chip, chipText:t.chipText}; })();
+  const blank = {seconds:0, running:false, activity:acts[0], phase:"idle"};
+  const [earnChoice, setEarnChoice] = React.useState(null);
+  const firedRef = React.useRef(false);
+
+  const phase = timerState.phase || "idle";
+  const secs  = timerState.seconds || 0;
+  const mm    = String(Math.floor(secs / 60)).padStart(2, "0");
+  const ss    = String(secs % 60).padStart(2, "0");
+  const act   = timerState.activity || acts[0];
+  const accentColor = col.accent;
+  const hasNoActiveTimer = !timerState || timerState.phase === "idle";
+
+  // Reset firedRef when phase resets
+  React.useEffect(() => {
+    if (phase === "idle") firedRef.current = false;
+  }, [phase]);
+
+  /* ── IDLE card ── */
+  if (hasNoActiveTimer) {
+    return React.createElement('div', { style: {
+        flex:"1 1 300px", minWidth:0, background:"white",
+        border:".5px solid rgba(0,0,0,0.08)", borderRadius:16,
+        overflow:"hidden", opacity:0.85}}
+      , React.createElement('div', { style: {
+          background: col.accent, padding:"14px 14px 16px",
+          display:"flex", alignItems:"center", gap:10}}
+        , React.createElement('div', { style: {
+            width:40, height:40, borderRadius:"50%", flexShrink:0,
+            background:"rgba(255,255,255,0.2)",
+            border:"2px solid rgba(255,255,255,0.5)",
+            display:"flex", alignItems:"center", justifyContent:"center", fontSize:22}},
+          kid.emoji)
+        , React.createElement('div', null
+          , React.createElement('div', { style: {fontSize:15, fontWeight:800, color:"white", letterSpacing:"-.3px"}}, kid.name)
+          , React.createElement('div', { style: {fontSize:11, color:"rgba(255,255,255,0.65)", fontWeight:500, marginTop:1}}, "Redo att starta")
+        )
+      )
+      , React.createElement('div', { style: {
+          padding:"20px 16px", display:"flex", flexDirection:"column",
+          alignItems:"center", gap:10, textAlign:"center"}}
+        , React.createElement('div', { style: {fontSize:11, color:"#8e8e93", lineHeight:1.5}},
+          "Ingen aktiv aktivitet")
+        , React.createElement('button', {
+            onClick: () => {
+              setSplitSessionIds(prev => prev.filter(id => id !== kid.id));
+              setView("timer");
+            },
+            style: {
+              background: col.accent, border:"none", borderRadius:50,
+              padding:"7px 18px", color:"white", fontWeight:700,
+              fontSize:12, cursor:"pointer"}},
+          "▶ Starta aktivitet")
+      )
+    );
+  }
+
+  /* ── ACTIVE card ── */
+  return React.createElement(React.Fragment, {key: kid.id}
+    , React.createElement('div', { style: {
+        flex:"1 1 300px", minWidth:0, background:"white",
+        border:".5px solid rgba(0,0,0,0.08)", borderRadius:16,
+        overflow:"hidden"}}
+
+      , React.createElement('div', { style: {
+          background: col.accent, padding:"14px 14px 16px",
+          display:"flex", alignItems:"center", gap:10}}
+        , React.createElement('div', { style: {
+            width:40, height:40, borderRadius:"50%", flexShrink:0,
+            background:"rgba(255,255,255,0.2)",
+            border:"2px solid rgba(255,255,255,0.5)",
+            display:"flex", alignItems:"center", justifyContent:"center", fontSize:22}},
+          kid.emoji)
+        , React.createElement('div', { style:{flex:1}}
+          , React.createElement('div', { style:{fontSize:15, fontWeight:800, color:"white", letterSpacing:"-.3px"}}, kid.name)
+          , React.createElement('div', { style:{fontSize:11, color:"rgba(255,255,255,0.7)", fontWeight:500, marginTop:1}},
+              secs > 0 ? mm+":"+ss : "—")
+        )
+        , phase === "running" && React.createElement('div', { style: {
+            display:"flex", alignItems:"center", gap:4,
+            background:"rgba(255,255,255,0.2)", borderRadius:50, padding:"3px 10px"}}
+          , React.createElement('div', { style:{width:6, height:6, borderRadius:"50%",
+              background:"#4ade80", animation:"pulse 1.4s ease infinite"}})
+          , React.createElement('span', { style:{fontSize:11, fontWeight:600, color:"white"}}, "Aktiv")
+        )
+        , phase === "paused" && React.createElement('div', { style: {
+            background:"rgba(0,0,0,0.2)", borderRadius:50, padding:"3px 10px",
+            fontSize:11, fontWeight:600, color:"rgba(255,255,255,0.8)"}}, "Pausad")
+      )
+
+      , React.createElement('div', { style: {display:"flex", gap:0}}
+        , React.createElement('div', { style: {
+            flex:1, minWidth:0, padding:"10px 10px",
+            borderRight:".5px solid rgba(0,0,0,0.07)",
+            display:"flex", flexDirection:"column", justifyContent:"center"}}
+          , act && (() => {
+              const _a = {...(acts.find(a => a.id === act.id)||{}), ...act};
+              const diff = _a.difficulty || 1;
+              const DIFF_LABEL = ["","Lätt","Medel","Svår"];
+              const DIFF_COLOR = ["","#1a6b35","#8a5c00","#b91c1c"];
+              const DIFF_BG    = ["","#e8faf0","#fef3e0","#fff1f2"];
+              return React.createElement('div', { style: {
+                  background: _a.color ? _a.color+"12" : "#f8f7f5",
+                  border: "1.5px solid "+(_a.color||"#e5e5ea"),
+                  borderRadius:10, padding:"8px 10px",
+                  display:"flex", alignItems:"center", gap:8}}
+                , React.createElement('span', {style:{fontSize:20, flexShrink:0}}, _a.icon||"⭐")
+                , React.createElement('div', null
+                  , React.createElement('div', {style:{fontSize:11, fontWeight:700, color:"#1c1c1e", lineHeight:1.2}}, _a.label||"Aktivitet")
+                  , React.createElement('div', {style:{display:"flex", gap:4, marginTop:3, flexWrap:"wrap"}}
+                    , React.createElement('span', {style:{fontSize:9, fontWeight:600,
+                        color:DIFF_COLOR[diff], background:DIFF_BG[diff],
+                        borderRadius:50, padding:"1px 6px"}}, DIFF_LABEL[diff])
+                    , _a.rewardType === "fixed" && React.createElement('span', {style:{
+                        fontSize:9, fontWeight:600, color:"#1a9464", background:"#e8faf0",
+                        borderRadius:50, padding:"1px 6px"}}, "+"+(_a.fixedMinutes||5)+" min")
+                    , _a.rewardType === "fixedPoints" && React.createElement('span', {style:{
+                        fontSize:9, fontWeight:600, color:"#8a6000", background:"#fef3e0",
+                        borderRadius:50, padding:"1px 6px"}}, "+"+(_a.fixedPoints||10)+" ⭐")
+                  )
+                )
+              );
+            })()
+        )
+        , React.createElement('div', { style: {
+            width:110, flexShrink:0,
+            display:"flex", alignItems:"center", justifyContent:"center",
+            padding:"10px 8px"}}
+          , React.createElement('div', { style: {position:"relative", width:80, height:80,
+              display:"flex", alignItems:"center", justifyContent:"center"}}
+            , React.createElement('svg', {width:80, height:80,
+                style:{position:"absolute", top:0, left:0, transform:"rotate(-90deg)"}}
+              , React.createElement('circle', {cx:40, cy:40, r:33, fill:"none",
+                  stroke:"rgba(0,0,0,0.07)", strokeWidth:5})
+              , React.createElement('circle', {cx:40, cy:40, r:33, fill:"none",
+                  stroke:accentColor, strokeWidth:5, strokeLinecap:"round",
+                  strokeDasharray:2*Math.PI*33,
+                  strokeDashoffset:2*Math.PI*33*(1-Math.min(1,secs/((act&&act.minutes?act.minutes*60:1800)||1800))),
+                  style:{transition:"stroke-dashoffset 0.6s ease"}})
+            )
+            , React.createElement('div', {style:{textAlign:"center"}}
+              , React.createElement('div', {style:{
+                  fontSize:17, fontWeight:700, color:"#1c1c1e",
+                  letterSpacing:"-0.5px", fontVariantNumeric:"tabular-nums", lineHeight:1}},
+                mm, ":", ss)
+              , React.createElement('div', {style:{fontSize:9, color:"#8e8e93", marginTop:1}},
+                phase==="running" ? "● räknar" : "pausad")
+            )
+          )
+        )
+      )
+
+      , (phase === "running" || phase === "paused") && React.createElement('div', { style: {
+          borderTop: ".5px solid rgba(0,0,0,0.07)",
+          display:"grid", gridTemplateColumns:"1fr 1fr"}}
+        , phase === "running"
+          ? React.createElement('button', {
+              onClick: () => setTimerState(p => ({...p, running:false, phase:"paused"})),
+              style: {background:"none", border:"none",
+                borderRight:".5px solid rgba(0,0,0,0.07)",
+                padding:"9px 0", fontSize:12, fontWeight:500,
+                color:"#8a6000", cursor:"pointer",
+                display:"flex", alignItems:"center", justifyContent:"center", gap:5}},
+              React.createElement('span',{style:{fontSize:13}},"⏸"), " Pausa")
+          : React.createElement('button', {
+              onClick: () => setTimerState(p => ({...p, running:true, phase:"running"})),
+              style: {background:"none", border:"none",
+                borderRight:".5px solid rgba(0,0,0,0.07)",
+                padding:"9px 0", fontSize:12, fontWeight:500,
+                color:"#1a6b35", cursor:"pointer",
+                display:"flex", alignItems:"center", justifyContent:"center", gap:5}},
+              React.createElement('span',{style:{fontSize:13}},"▶"), " Fortsätt")
+        , React.createElement('div', {style:{display:"flex", alignItems:"center", justifyContent:"center"}}
+          , React.createElement(HoldToStop, {
+              onStop: () => {
+                if (secs < 5) { showToast("⚡ För kort!"); return; }
+                if (firedRef.current) return;
+                firedRef.current = true;
+                setTimerState(p => ({...p, running:false, phase:"done"}));
+                const rawMins = Math.ceil(secs / 60);
+                const mins = (act && act.rewardType === "fixed" && act.fixedMinutes) ? act.fixedMinutes : rawMins;
+                const ratio = (act && act.pointRatio) ? act.pointRatio : 1;
+                const fixedPts = (act && act.rewardType === "fixedPoints") ? (act.fixedPoints||10) : null;
+                setEarnChoice({mins, pointRatio:ratio,
+                  isFixed:!!(act&&act.rewardType==="fixed"), fixedPts,
+                  rewardType:(act&&act.rewardType)||"time",
+                  actId:act&&act.id, actLabel:act&&act.label, actIcon:act&&act.icon});
+              },
+              color:"#b91c1c", compact:true, pillBar:true})
+        )
+      )
+    )
+
+    /* EarnChoiceDialog — owned by THIS card, isolated from timer ticks */
+    , earnChoice && React.createElement(EarnChoiceDialog, {
+        key: kid.id+"_earn",
+        child: kid, mins: earnChoice.mins, pointRatio: earnChoice.pointRatio,
+        fixedPts: earnChoice.fixedPts, rewardType: earnChoice.rewardType || "time",
+        onChooseTime: () => {
+          const entry = {id:Date.now()+Math.random(), activity:(earnChoice.actId||"unknown"),
+            label:(earnChoice.actLabel||"Aktivitet"), icon:(earnChoice.actIcon||"⭐"),
+            minutes:earnChoice.mins, date:new Date().toLocaleDateString("sv-SE")};
+          updateChild(kid.id, {balance:kid.balance+earnChoice.mins, history:[entry,...(kid.history||[])]});
+          burst();
+          setEarnChoice(null);
+          setTimerState(blank);
+          if (window._showVictory) window._showVictory({ child:kid, isReward:false,
+            activityEmoji: earnChoice.actIcon||"⏱️",
+            activityTitle: (earnChoice.actLabel||"Aktivitet")+" klar!",
+            earnedMins: earnChoice.mins, earnedPoints:0, standalone:true });
+        },
+        onChoosePoints: (pts) => {
+          const entry = {id:Date.now()+Math.random(), activity:(earnChoice.actId||"unknown"),
+            label:(earnChoice.actLabel||"Aktivitet"), icon:(earnChoice.actIcon||"⭐"),
+            minutes:0, points:pts, date:new Date().toLocaleDateString("sv-SE")};
+          updateChild(kid.id, {points:(kid.points||0)+pts, history:[entry,...(kid.history||[])]});
+          burst();
+          setEarnChoice(null);
+          setTimerState(blank);
+        },
+        onHome: () => { setEarnChoice(null); setTimerState(blank); setView("home"); },
+        onRestart: () => { setEarnChoice(null); setTimerState(blank); firedRef.current = false; }
+      })
+  );
+}
+
 function SplitTimerView({kidList, updateChild, showToast, activities, activityCategories, timerStates, setTimerStates, setView, setActiveChild, setSplitSessionIds}) {
   const cats = (activityCategories && activityCategories.length)
     ? activityCategories : DEFAULT_ACTIVITY_CATEGORIES;
@@ -3810,8 +4203,6 @@ function SplitTimerView({kidList, updateChild, showToast, activities, activityCa
   })));
   const acts = allCatActs.length ? allCatActs : (activities && activities.length ? activities : DEFAULT_ACTIVITIES);
   const blank = {seconds:0, running:false, activity:acts[0], phase:"idle"};
-  const [earnChoices, setEarnChoices] = React.useState({});
-  const firedKidsRef = React.useRef({});
 
   return (
     React.createElement('div', { style: {padding:"10px 8px 24px", maxWidth:1000, margin:"0 auto"}}
@@ -3820,281 +4211,20 @@ function SplitTimerView({kidList, updateChild, showToast, activities, activityCa
           flexDirection:"column",
           gap:12
         }}
-        , kidList.map((kid, kidIdx) => {
-          const col = (() => { const t = getTheme(kid); return {bg:t.bg, border:t.border, accent:t.accent, chip:t.chip, chipText:t.chipText}; })();
+        , kidList.map((kid) => {
           const timerState = timerStates[kid.id] || blank;
           const setTimerState = updFn =>
             setTimerStates(prev => ({
               ...prev,
               [kid.id]: typeof updFn === "function" ? updFn(prev[kid.id] || blank) : updFn
             }));
-
-          const phase = timerState.phase || "idle";
-          const secs  = timerState.seconds || 0;
-          const mm    = String(Math.floor(secs / 60)).padStart(2, "0");
-          const ss    = String(secs % 60).padStart(2, "0");
-          const act   = timerState.activity || acts[0];
-          const accentColor = col.accent;
-          const hasNoActiveTimer = !timerStates[kid.id] || timerStates[kid.id].phase === "idle";
-
-          const stopCb = () => {
-            if (secs < 5) { showToast("⚡ För kort!"); return; }
-            setTimerState(p => ({...p, running:false, phase:"done"}));
-            const rawMins = Math.ceil(secs / 60);
-            const mins = (act && act.rewardType === "fixed" && act.fixedMinutes) ? act.fixedMinutes : rawMins;
-            const ratio = (act && act.pointRatio) ? act.pointRatio : 1;
-            const fixedPts = (act && act.rewardType === "fixedPoints") ? (act.fixedPoints||10) : null;
-            // Use TimerPanel's earn flow via compact=true — let TimerPanel handle EarnChoiceDialog
-          };
-
-          /* ── IDLE card ── */
-          if (hasNoActiveTimer) {
-            return (
-              React.createElement('div', { key: kid.id, style: {
-                  flex:"1 1 300px", minWidth:0, background:"white",
-                  border:".5px solid rgba(0,0,0,0.08)", borderRadius:16,
-                  overflow:"hidden", opacity:0.85}}
-
-                /* full-bleed header */
-                , React.createElement('div', { style: {
-                    background: col.accent, padding:"14px 14px 16px",
-                    display:"flex", alignItems:"center", gap:10}}
-                  , React.createElement('div', { style: {
-                      width:40, height:40, borderRadius:"50%", flexShrink:0,
-                      background:"rgba(255,255,255,0.2)",
-                      border:"2px solid rgba(255,255,255,0.5)",
-                      display:"flex", alignItems:"center", justifyContent:"center", fontSize:22}},
-                    kid.emoji)
-                  , React.createElement('div', null
-                    , React.createElement('div', { style: {fontSize:15, fontWeight:800, color:"white", letterSpacing:"-.3px"}}, kid.name)
-                    , React.createElement('div', { style: {fontSize:11, color:"rgba(255,255,255,0.65)", fontWeight:500, marginTop:1}}, "Redo att starta")
-                  )
-                )
-
-                /* idle body */
-                , React.createElement('div', { style: {
-                    padding:"20px 16px", display:"flex", flexDirection:"column",
-                    alignItems:"center", gap:10, textAlign:"center"}}
-                  , React.createElement('div', { style: {fontSize:11, color:"#8e8e93", lineHeight:1.5}},
-                    "Ingen aktiv aktivitet")
-                  , React.createElement('button', {
-                      onClick: () => {
-                        setSplitSessionIds(prev => prev.filter(id => id !== kid.id));
-                        setActiveChild(kid.id); setView("timer");
-                      },
-                      style: {
-                        background: col.accent, border:"none", borderRadius:50,
-                        padding:"7px 18px", color:"white", fontWeight:700,
-                        fontSize:12, cursor:"pointer"}},
-                    "▶ Starta aktivitet")
-                )
-              )
-            );
-          }
-
-          /* ── ACTIVE card ── */
-          return (
-            React.createElement('div', { key: kid.id, style: {
-                flex:"1 1 300px", minWidth:0, background:"white",
-                border:".5px solid rgba(0,0,0,0.08)", borderRadius:16,
-                overflow:"hidden"}}
-
-              /* ── Full-bleed header ── */
-              , React.createElement('div', { style: {
-                  background: col.accent, padding:"14px 14px 16px",
-                  display:"flex", alignItems:"center", gap:10}}
-                , React.createElement('div', { style: {
-                    width:40, height:40, borderRadius:"50%", flexShrink:0,
-                    background:"rgba(255,255,255,0.2)",
-                    border:"2px solid rgba(255,255,255,0.5)",
-                    display:"flex", alignItems:"center", justifyContent:"center", fontSize:22}},
-                  kid.emoji)
-                , React.createElement('div', { style:{flex:1}}
-                  , React.createElement('div', { style:{fontSize:15, fontWeight:800, color:"white", letterSpacing:"-.3px"}}, kid.name)
-                  , React.createElement('div', { style:{fontSize:11, color:"rgba(255,255,255,0.7)", fontWeight:500, marginTop:1}},
-                      secs > 0 ? mm+":"+ss : "—")
-                )
-                , phase === "running" && React.createElement('div', { style: {
-                    display:"flex", alignItems:"center", gap:4,
-                    background:"rgba(255,255,255,0.2)", borderRadius:50, padding:"3px 10px"}}
-                  , React.createElement('div', { style:{width:6, height:6, borderRadius:"50%",
-                      background:"#4ade80", animation:"pulse 1.4s ease infinite"}})
-                  , React.createElement('span', { style:{fontSize:11, fontWeight:600, color:"white"}}, "Aktiv")
-                )
-                , phase === "paused" && React.createElement('div', { style: {
-                    background:"rgba(0,0,0,0.2)", borderRadius:50, padding:"3px 10px",
-                    fontSize:11, fontWeight:600, color:"rgba(255,255,255,0.8)"}}, "Pausad")
-              )
-
-              /* ── Body: activity chip + ring side by side ── */
-              , React.createElement('div', { style: {display:"flex", gap:0}}
-
-                /* Activity info */
-                , React.createElement('div', { style: {
-                    flex:1, minWidth:0, padding:"10px 10px",
-                    borderRight:".5px solid rgba(0,0,0,0.07)",
-                    display:"flex", flexDirection:"column", justifyContent:"center"}}
-                  , act && (() => {
-                      const _a = {...(acts.find(a => a.id === act.id)||{}), ...act};
-                      const diff = _a.difficulty || 1;
-                      const DIFF_LABEL = ["","Lätt","Medel","Svår"];
-                      const DIFF_COLOR = ["","#1a6b35","#8a5c00","#b91c1c"];
-                      const DIFF_BG    = ["","#e8faf0","#fef3e0","#fff1f2"];
-                      return React.createElement('div', { style: {
-                          background: _a.color ? _a.color+"12" : "#f8f7f5",
-                          border: "1.5px solid "+(_a.color||"#e5e5ea"),
-                          borderRadius:10, padding:"8px 10px",
-                          display:"flex", alignItems:"center", gap:8}}
-                        , React.createElement('span', {style:{fontSize:20, flexShrink:0}}, _a.icon||"⭐")
-                        , React.createElement('div', null
-                          , React.createElement('div', {style:{fontSize:11, fontWeight:700, color:"#1c1c1e", lineHeight:1.2}}, _a.label||"Aktivitet")
-                          , React.createElement('div', {style:{display:"flex", gap:4, marginTop:3, flexWrap:"wrap"}}
-                            , React.createElement('span', {style:{fontSize:9, fontWeight:600,
-                                color:DIFF_COLOR[diff], background:DIFF_BG[diff],
-                                borderRadius:50, padding:"1px 6px"}}, DIFF_LABEL[diff])
-                            , _a.rewardType === "fixed" && React.createElement('span', {style:{
-                                fontSize:9, fontWeight:600, color:"#1a9464", background:"#e8faf0",
-                                borderRadius:50, padding:"1px 6px"}}, "+"+(_a.fixedMinutes||5)+" min")
-                            , _a.rewardType === "fixedPoints" && React.createElement('span', {style:{
-                                fontSize:9, fontWeight:600, color:"#8a6000", background:"#fef3e0",
-                                borderRadius:50, padding:"1px 6px"}}, "+"+(_a.fixedPoints||10)+" ⭐")
-                          )
-                        )
-                      );
-                    })()
-                )
-
-                /* Ring */
-                , React.createElement('div', { style: {
-                    width:110, flexShrink:0,
-                    display:"flex", alignItems:"center", justifyContent:"center",
-                    padding:"10px 8px"}}
-                  , React.createElement('div', { style: {position:"relative", width:80, height:80,
-                      display:"flex", alignItems:"center", justifyContent:"center"}}
-                    , React.createElement('svg', {width:80, height:80,
-                        style:{position:"absolute", top:0, left:0, transform:"rotate(-90deg)"}}
-                      , React.createElement('circle', {cx:40, cy:40, r:33, fill:"none",
-                          stroke:"rgba(0,0,0,0.07)", strokeWidth:5})
-                      , React.createElement('circle', {cx:40, cy:40, r:33, fill:"none",
-                          stroke:accentColor, strokeWidth:5, strokeLinecap:"round",
-                          strokeDasharray:2*Math.PI*33,
-                          strokeDashoffset:2*Math.PI*33*(1-Math.min(1,secs/((act&&act.minutes?act.minutes*60:1800)||1800))),
-                          style:{transition:"stroke-dashoffset 0.6s ease"}})
-                    )
-                    , React.createElement('div', {style:{textAlign:"center"}}
-                      , React.createElement('div', {style:{
-                          fontSize:17, fontWeight:700, color:"#1c1c1e",
-                          letterSpacing:"-0.5px", fontVariantNumeric:"tabular-nums", lineHeight:1}},
-                        mm, ":", ss)
-                      , React.createElement('div', {style:{fontSize:9, color:"#8e8e93", marginTop:1}},
-                        phase==="running" ? "● räknar" : "pausad")
-                    )
-                  )
-                )
-              )
-
-              /* ── Pill-bar: Pausa/Fortsätt | Håll för stopp ── */
-              /* pill-bar controls */
-              , (phase === "running" || phase === "paused") && React.createElement('div', { style: {
-                  borderTop: ".5px solid rgba(0,0,0,0.07)",
-                  display:"grid", gridTemplateColumns:"1fr 1fr"}}
-                , phase === "running"
-                  ? React.createElement('button', {
-                      onClick: () => setTimerState(p => ({...p, running:false, phase:"paused"})),
-                      style: {background:"none", border:"none",
-                        borderRight:".5px solid rgba(0,0,0,0.07)",
-                        padding:"9px 0", fontSize:12, fontWeight:500,
-                        color:"#8a6000", cursor:"pointer",
-                        display:"flex", alignItems:"center", justifyContent:"center", gap:5}},
-                      React.createElement('span',{style:{fontSize:13}},"⏸"), " Pausa")
-                  : React.createElement('button', {
-                      onClick: () => setTimerState(p => ({...p, running:true, phase:"running"})),
-                      style: {background:"none", border:"none",
-                        borderRight:".5px solid rgba(0,0,0,0.07)",
-                        padding:"9px 0", fontSize:12, fontWeight:500,
-                        color:"#1a6b35", cursor:"pointer",
-                        display:"flex", alignItems:"center", justifyContent:"center", gap:5}},
-                      React.createElement('span',{style:{fontSize:13}},"▶"), " Fortsätt")
-                , React.createElement('div', {style:{display:"flex", alignItems:"center", justifyContent:"center"}}
-                  , React.createElement(HoldToStop, {
-                      onStop: () => {
-                        if (secs < 5) { showToast("⚡ För kort!"); return; }
-                        if (firedKidsRef.current[kid.id]) return; // guard repeat touch
-                        firedKidsRef.current[kid.id] = true;
-                        setTimerState(p => ({...p, running:false, phase:"done"}));
-                        const rawMins = Math.ceil(secs / 60);
-                        const mins = (act && act.rewardType === "fixed" && act.fixedMinutes) ? act.fixedMinutes : rawMins;
-                        const ratio = (act && act.pointRatio) ? act.pointRatio : 1;
-                        const fixedPts = (act && act.rewardType === "fixedPoints") ? (act.fixedPoints||10) : null;
-                        setEarnChoices(prev => ({...prev, [kid.id]: {mins, pointRatio:ratio,
-                          isFixed:!!(act&&act.rewardType==="fixed"), fixedPts,
-                          rewardType:(act&&act.rewardType)||"time",
-                          actId:act&&act.id, actLabel:act&&act.label, actIcon:act&&act.icon}}));
-                      },
-                      color:"#b91c1c", compact:true, pillBar:true})
-                )
-              )
-            )
-          );
-        })
-      )
-
-      /* Per-child EarnChoiceDialog */
-      , kidList.map(kid => {
-          const ec = earnChoices[kid.id];
-          if (!ec) return null;
-          return React.createElement(EarnChoiceDialog, {
-            key: kid.id+"_earn",
-            child: kid,
-            mins: ec.mins,
-            pointRatio: ec.pointRatio,
-            isFixed: ec.isFixed,
-            fixedPts: ec.fixedPts,
-            rewardType: ec.rewardType || "time",
-            actId: ec.actId,
-            actLabel: ec.actLabel,
-            actIcon: ec.actIcon,
-            updateChild: updateChild,
-            showToast: showToast,
-            onChooseTime: () => {
-              const entry = {id:Date.now()+Math.random(), activity:(ec.actId||"unknown"),
-                label:(ec.actLabel||"Aktivitet"), icon:(ec.actIcon||"⭐"),
-                minutes:ec.mins, date:new Date().toLocaleDateString("sv-SE")};
-              updateChild(kid.id, {balance:kid.balance+ec.mins, history:[entry,...(kid.history||[])]});
-              burst();
-              setEarnChoices(prev => { const n={...prev}; delete n[kid.id]; return n; }); if(firedKidsRef && firedKidsRef.current) delete firedKidsRef.current[kid.id];
-              setTimerStates(prev => ({...prev, [kid.id]: blank}));
-              if (window._showVictory) {
-                window._showVictory({ child:kid, isReward:false,
-                  activityEmoji: ec.actIcon||"⏱️",
-                  activityTitle: (ec.actLabel||"Aktivitet")+" klar!",
-                  earnedMins: ec.mins, earnedPoints:0, standalone:true });
-              }
-            },
-            onChoosePoints: (pts) => {
-              const entry = {id:Date.now()+Math.random(), activity:(ec.actId||"unknown"),
-                label:(ec.actLabel||"Aktivitet"), icon:(ec.actIcon||"⭐"),
-                minutes:0, points:pts, date:new Date().toLocaleDateString("sv-SE")};
-              updateChild(kid.id, {points:(kid.points||0)+pts, history:[entry,...(kid.history||[])]});
-              burst();
-              setEarnChoices(prev => { const n={...prev}; delete n[kid.id]; return n; }); if(firedKidsRef && firedKidsRef.current) delete firedKidsRef.current[kid.id];
-              setTimerStates(prev => ({...prev, [kid.id]: blank}));
-            },
-            onDismiss: () => {
-              setEarnChoices(prev => { const n={...prev}; delete n[kid.id]; return n; }); if(firedKidsRef && firedKidsRef.current) delete firedKidsRef.current[kid.id];
-              setTimerStates(prev => ({...prev, [kid.id]: blank}));
-            },
-            onHome: () => {
-              setEarnChoices(prev => { const n={...prev}; delete n[kid.id]; return n; }); if(firedKidsRef && firedKidsRef.current) delete firedKidsRef.current[kid.id];
-              setTimerStates(prev => ({...prev, [kid.id]: blank}));
-              if (setView) setView("home");
-            },
-            onRestart: () => {
-              setEarnChoices(prev => { const n={...prev}; delete n[kid.id]; return n; }); if(firedKidsRef && firedKidsRef.current) delete firedKidsRef.current[kid.id];
-              setTimerStates(prev => ({...prev, [kid.id]: blank}));
-            }
+          return React.createElement(SplitKidCard, {
+            key: kid.id,
+            kid, timerState, setTimerState, acts,
+            showToast, updateChild, setView, setSplitSessionIds
           });
         })
+      )
     )
   );
 }
@@ -5958,26 +6088,34 @@ function SettingsView({data, setData, showToast, timerStates, setTimerStates, on
   /* ── Children ── */
   const [editChild,   setEditChild]   = useState(null);
   const [showAddChild, setShowAddChild] = useState(false);
-  const [addName,  setAddName]  = useState("");
-  const [addEmoji, setAddEmoji] = useState(EMOJIS[0]);
-  const [addBg,    setAddBg]    = useState(BG_COLORS[0]);
-  const [addTheme, setAddTheme] = useState(CHILD_THEMES[0].id);
+  const [addName,   setAddName]   = useState("");
+  const [addEmoji,  setAddEmoji]  = useState(EMOJIS[0]);
+  const [addBg,     setAddBg]     = useState(BG_COLORS[0]);
+  const [addTheme,  setAddTheme]  = useState(CHILD_THEMES[0].id);
+  const [addAvatar, setAddAvatar] = useState(null);
   const addChild = () => {
     if (!addName.trim()) return;
-    const newKid = {id:Date.now().toString(), name:addName.trim(), emoji:addEmoji, bg:addBg, theme:addTheme, balance:0, points:0, targets:[], history:[]};
+    const newKid = {id:Date.now().toString(), name:addName.trim(), emoji:addEmoji, bg:addBg, avatar:addAvatar||null, theme:CHILD_THEMES[0].id, balance:0, points:0, targets:[], history:[]};
     setData(d => ({...d, children:[...d.children, newKid]}));
-    setAddName(""); setAddEmoji(EMOJIS[0]); setAddBg(BG_COLORS[0]); setShowAddChild(false);
+    setAddName(""); setAddEmoji(EMOJIS[0]); setAddBg(BG_COLORS[0]); setAddAvatar(null); setShowAddChild(false);
     showToast(addEmoji + " " + addName.trim() + " lagd till!");
   };
   const [editName,    setEditName]    = useState("");
   const [editEmoji,   setEditEmoji]   = useState("");
   const [editBg,      setEditBg]      = useState("");
+  const [editShowEmoji, setEditShowEmoji] = useState(false);
+  const [editShowColor, setEditShowColor] = useState(false);
+  const [editAvatar,    setEditAvatar]    = useState(null);
   const [deleteId,    setDeleteId]    = useState(null); // which child is pending delete
 
-  const openEdit = c => { setEditChild(c); setEditName(c.name); setEditEmoji(c.emoji); setEditBg(c.bg||BG_COLORS[0]); };
+  const openEdit = c => {
+    setEditChild(c); setEditName(c.name); setEditEmoji(c.emoji);
+    setEditBg(c.bg||BG_COLORS[0]); setEditAvatar(c.avatar||null);
+    setEditShowEmoji(false); setEditShowColor(false);
+  };
   const saveEdit = () => {
     setData(d=>({...d,children:d.children.map(c=>c.id===editChild.id
-      ?{...c,name:editName,emoji:editEmoji,bg:editBg}:c)}));
+      ?{...c,name:editName,emoji:editEmoji,bg:editBg,avatar:editAvatar}:c)}));
     setEditChild(null); showToast("✅ Ändringar sparade!");
   };
   const confirmDelete = id => {
@@ -6280,7 +6418,7 @@ function SettingsView({data, setData, showToast, timerStates, setTimerStates, on
       _meta: {
         exportedAt:   today.toISOString(),
         exportedDate: dateStr,
-        version:      "v4",
+        version:      "v5",
         appName:      "Belöningsbanken"
       },
       children:    data.children    || [],
@@ -6338,6 +6476,8 @@ function SettingsView({data, setData, showToast, timerStates, setTimerStates, on
       next.children = rawKids.map(c => {
         let kid = {
           id: c.id, name: c.name, emoji: c.emoji, bg: c.bg,
+          theme: c.theme || CHILD_THEMES[0].id,
+          avatar: sel.bilder ? (c.avatar || null) : (data.children.find(x=>x.id===c.id)||{}).avatar || null,
           balance: sel.tid      ? (c.balance      || 0) : (data.children.find(x=>x.id===c.id)||{}).balance      || 0,
           points:  sel.poang    ? (c.points       || 0) : (data.children.find(x=>x.id===c.id)||{}).points       || 0,
           history: sel.tid      ? (c.history      || []) : (data.children.find(x=>x.id===c.id)||{}).history     || [],
@@ -6692,7 +6832,7 @@ function SettingsView({data, setData, showToast, timerStates, setTimerStates, on
                   border:".5px solid rgba(0,0,0,0.08)"}}
 
               , React.createElement('div', {style:{display:"flex", alignItems:"center",
-                  justifyContent:"space-between", marginBottom:14}}
+                  justifyContent:"space-between", marginBottom:16}}
                 , React.createElement('div', {style:{fontSize:15, fontWeight:800, color:"#1c1c1e"}}, "Lägg till barn")
                 , React.createElement('button', {onClick:()=>setShowAddChild(false),
                     style:{background:"#f2f2f7", border:".5px solid rgba(0,0,0,0.08)", borderRadius:50,
@@ -6701,52 +6841,84 @@ function SettingsView({data, setData, showToast, timerStates, setTimerStates, on
               )
 
               /* Name */
-              , React.createElement('label', {style:{display:"block",fontWeight:700,
-                  color:"#3c3c43",fontSize:11,marginBottom:5,letterSpacing:1}}, "NAMN")
+              , React.createElement('label', {style:{display:"block", fontWeight:700,
+                  color:"#8e8e93", fontSize:11, marginBottom:5, letterSpacing:".06em", textTransform:"uppercase"}}, "Namn")
               , React.createElement('input', {value:addName,
                   onChange:e=>setAddName(e.target.value),
                   onKeyDown:e=>e.key==="Enter"&&addChild(),
                   placeholder:"Barnets namn…",
-                  style:{width:"100%",border:".5px solid rgba(0,0,0,0.1)",borderRadius:12,
-                    padding:"10px 14px",fontSize:15,marginBottom:14,boxSizing:"border-box"}})
+                  style:{width:"100%", border:".5px solid rgba(0,0,0,0.1)", borderRadius:12,
+                    padding:"10px 14px", fontSize:15, marginBottom:14, boxSizing:"border-box"}})
 
-              /* Emoji — compact grid */
-              , React.createElement('label', {style:{display:"block",fontWeight:700,
-                  color:"#3c3c43",fontSize:11,marginBottom:6,letterSpacing:1}}, "EMOJI")
-              , React.createElement('div', {style:{display:"flex",flexWrap:"wrap",gap:5,marginBottom:14}}
-                , EMOJIS.map(e=>
-                    React.createElement('button', {key:e, onClick:()=>setAddEmoji(e),
-                      style:{fontSize:22,background:e===addEmoji?"#fff7ed":"transparent",
-                        border:e===addEmoji?"2px solid #f97316":"2px solid transparent",
-                        borderRadius:9,width:36,height:36,cursor:"pointer",transition:"all 0.15s"}},
-                      e
+              /* Profilbild */
+              , React.createElement('label', {style:{display:"block", fontWeight:700,
+                  color:"#8e8e93", fontSize:11, marginBottom:6, letterSpacing:".06em", textTransform:"uppercase"}}, "Profilbild")
+              , React.createElement('div', {style:{border:".5px solid rgba(0,0,0,0.1)", borderRadius:12, overflow:"hidden", marginBottom:14}}
+                , React.createElement('div', {style:{display:"flex", alignItems:"center", gap:12, padding:"12px 14px", background:"#f8f7f5"}}
+                  , React.createElement('div', {style:{
+                      width:44, height:44, borderRadius:"50%", flexShrink:0,
+                      background: addBg||"#edeafb", border:".5px solid rgba(0,0,0,0.1)",
+                      overflow:"hidden", display:"flex", alignItems:"center", justifyContent:"center", fontSize:22}}
+                    , addAvatar
+                        ? React.createElement('img', {src:addAvatar, style:{width:"100%",height:"100%",objectFit:"cover"}})
+                        : addEmoji
+                  )
+                  , React.createElement('div', {style:{flex:1, display:"flex", flexDirection:"column", gap:6}}
+                    , React.createElement('label', {style:{
+                        display:"flex", alignItems:"center", gap:8, cursor:"pointer",
+                        background:"white", border:".5px solid rgba(0,0,0,0.1)",
+                        borderRadius:9, padding:"7px 12px", fontSize:12, fontWeight:700, color:"#1c1c1e"}}
+                      , React.createElement('span', {style:{fontSize:15}}, "📷")
+                      , "Ta bild"
+                      , React.createElement('input', {type:"file", accept:"image/*", capture:"environment",
+                          style:{display:"none"},
+                          onChange: e => {
+                            const file = e.target.files[0]; if (!file) return;
+                            const reader = new FileReader();
+                            reader.onload = ev => setAddAvatar(ev.target.result);
+                            reader.readAsDataURL(file); e.target.value="";
+                          }})
+                    )
+                    , React.createElement('label', {style:{
+                        display:"flex", alignItems:"center", gap:8, cursor:"pointer",
+                        background:"white", border:".5px solid rgba(0,0,0,0.1)",
+                        borderRadius:9, padding:"7px 12px", fontSize:12, fontWeight:700, color:"#1c1c1e"}}
+                      , React.createElement('span', {style:{fontSize:15}}, "🖼️")
+                      , "Välj från galleri"
+                      , React.createElement('input', {type:"file", accept:"image/*",
+                          style:{display:"none"},
+                          onChange: e => {
+                            const file = e.target.files[0]; if (!file) return;
+                            const reader = new FileReader();
+                            reader.onload = ev => setAddAvatar(ev.target.result);
+                            reader.readAsDataURL(file); e.target.value="";
+                          }})
                     )
                   )
+                  , addAvatar && React.createElement('button', {
+                      onClick: () => setAddAvatar(null),
+                      style:{flexShrink:0, background:"#fff1f2", border:".5px solid #fecdd3",
+                        borderRadius:8, padding:"6px 10px", fontSize:12,
+                        fontWeight:700, color:"#b91c1c", cursor:"pointer"}},
+                      "✕")
+                )
               )
 
-              /* Theme picker — v2 */
-              , React.createElement('label', {style:{display:"block",fontWeight:700,
-                  color:"#8e8e93",fontSize:11,marginBottom:6,letterSpacing:1}}, "TEMA & FÄRG")
-              , React.createElement('div', {style:{display:"flex",gap:8,flexWrap:"wrap",marginBottom:16}}
-                , CHILD_THEMES.map(t=>
-                    React.createElement('button', {key:t.id, onClick:()=>setAddTheme(t.id),
-                      title:t.label,
-                      style:{
-                        width:36,height:36,borderRadius:10,cursor:"pointer",
-                        background:t.bg,
-                        border:t.id===addTheme?`3px solid ${t.accent}`:"2px solid transparent",
-                        transition:"all 0.15s",
-                        boxShadow:t.id===addTheme?`0 0 14px ${t.glow}99`:"none"
-                      }})
-                  )
-              )
+              /* Emoji — collapsed */
+              , React.createElement('label', {style:{display:"block", fontWeight:700,
+                  color:"#8e8e93", fontSize:11, marginBottom:6, letterSpacing:".06em", textTransform:"uppercase"}}, "Emoji")
+              , React.createElement(AddEmojiPicker, {value:addEmoji, onChange:setAddEmoji})
+
+              /* Tema & färg — same BG_COLORS as edit modal */
+              , React.createElement('label', {style:{display:"block", fontWeight:700,
+                  color:"#8e8e93", fontSize:11, marginBottom:6, marginTop:14, letterSpacing:".06em", textTransform:"uppercase"}}, "Kortfärg")
+              , React.createElement(AddColorPicker, {value:addBg, onChange:setAddBg})
 
               , React.createElement('button', {className:"btn-big", onClick:addChild,
-                  style:{width:"100%",background:"linear-gradient(135deg,#f97316,#fb923c)",
-                    border:"none",borderRadius:12,padding:"12px",color:"white",
-                    fontWeight:900,fontSize:16,cursor:"pointer",
-                    boxShadow:"0 4px 16px rgba(249,115,22,0.4)"}},
-                  "＋ Lägg till barn!"
+                  style:{width:"100%", background:"#6c5cc8", marginTop:16,
+                    border:"none", borderRadius:12, padding:"12px", color:"white",
+                    fontWeight:800, fontSize:15, cursor:"pointer"}},
+                  "＋ Lägg till barn"
                 )
             )
           )
@@ -7229,43 +7401,176 @@ function SettingsView({data, setData, showToast, timerStates, setTimerStates, on
 
       /* EDIT CHILD MODAL */
       , editChild && (
-        React.createElement(Modal, { onClose: ()=>setEditChild(null)}
-          , React.createElement('div', { style: {fontFamily:"'Fredoka One',cursive",fontSize:26,color:"#3b82f6",marginBottom:22}}, "✏️ Redigera "
-              , editChild.name
-          )
-          , React.createElement('label', { style: {display:"block",fontWeight:700,color:"#3c3c43",fontSize:12,marginBottom:6,letterSpacing:1}}, "NAMN")
-          , React.createElement('input', { value: editName, onChange: e=>setEditName(e.target.value),
-            style: {width:"100%",border:".5px solid rgba(0,0,0,0.1)",borderRadius:14,
-              padding:"13px 16px",fontSize:17,marginBottom:20}})
-          , React.createElement('label', { style: {display:"block",fontWeight:700,color:"#3c3c43",fontSize:12,marginBottom:8,letterSpacing:1}}, "EMOJI")
-          , React.createElement('div', { style: {display:"flex",flexWrap:"wrap",gap:8,marginBottom:20}}
-            , EMOJIS.map(e=>(
-              React.createElement('button', { key: e, onClick: ()=>setEditEmoji(e),
-                style: {fontSize:28,background:e===editEmoji?"#dbeafe":"transparent",
-                  border:e===editEmoji?"2px solid #3b82f6":"2px solid transparent",
-                  borderRadius:12,width:48,height:48,cursor:"pointer"}}
-                , e
-              )
-            ))
-          )
-          , React.createElement('label', { style: {display:"block",fontWeight:700,color:"#3c3c43",fontSize:12,marginBottom:8,letterSpacing:1}}, "KORTFÄRG")
-          , React.createElement('div', { style: {display:"flex",gap:10,flexWrap:"wrap",marginBottom:26}}
-            , BG_COLORS.map(c=>(
-              React.createElement('button', { key: c, onClick: ()=>setEditBg(c),
-                style: {width:38,height:38,borderRadius:10,background:c,cursor:"pointer",
-                  border:c===editBg?"3px solid #1e293b":"3px solid transparent"}})
-            ))
-          )
-          , React.createElement('div', { style: {display:"flex",gap:10}}
-            , React.createElement('button', { className: "btn-big", onClick: saveEdit,
-              style: {flex:1,background:"linear-gradient(135deg,#3b82f6,#6366f1)",border:"none",
-                borderRadius:14,padding:15,color:"white",fontWeight:900,fontSize:17,cursor:"pointer"}}, "💾 Spara ändringar"
+        React.createElement(Modal, { onClose: ()=>{ setEditChild(null); setDeleteId(null); }}
+          /* Header */
+          , React.createElement('div', { style: {fontSize:16, fontWeight:800, color:"#1c1c1e", marginBottom:20}},
+              "✏️ Redigera ", editChild.name)
 
+          /* Namn */
+          , React.createElement('label', { style: {display:"block", fontWeight:700, color:"#8e8e93", fontSize:11, marginBottom:6, letterSpacing:".06em", textTransform:"uppercase"}}, "Namn")
+          , React.createElement('input', { value: editName, onChange: e=>setEditName(e.target.value),
+            style: {width:"100%", border:".5px solid rgba(0,0,0,0.12)", borderRadius:12,
+              padding:"12px 14px", fontSize:16, marginBottom:16, boxSizing:"border-box"}})
+
+          /* Profilbild */
+          , React.createElement('label', { style: {display:"block", fontWeight:700, color:"#8e8e93", fontSize:11, marginBottom:6, letterSpacing:".06em", textTransform:"uppercase"}}, "Profilbild")
+          , React.createElement('div', { style:{border:".5px solid rgba(0,0,0,0.1)", borderRadius:12, overflow:"hidden", marginBottom:16}}
+            /* Preview + actions */
+            , React.createElement('div', { style:{display:"flex", alignItems:"center", gap:12, padding:"12px 14px", background:"#f8f7f5"}}
+              /* Avatar preview */
+              , React.createElement('div', { style:{
+                  width:52, height:52, borderRadius:"50%", flexShrink:0,
+                  background: editBg||"#edeafb",
+                  border:".5px solid rgba(0,0,0,0.1)",
+                  overflow:"hidden",
+                  display:"flex", alignItems:"center", justifyContent:"center", fontSize:28}}
+                , editAvatar
+                  ? React.createElement('img', {src:editAvatar, style:{width:"100%", height:"100%", objectFit:"cover"}})
+                  : editEmoji
+              )
+              , React.createElement('div', { style:{flex:1, display:"flex", flexDirection:"column", gap:6}}
+                /* Camera — capture */
+                , React.createElement('label', {
+                    style:{
+                      display:"flex", alignItems:"center", gap:8, cursor:"pointer",
+                      background:"white", border:".5px solid rgba(0,0,0,0.1)",
+                      borderRadius:9, padding:"7px 12px", fontSize:12, fontWeight:700, color:"#1c1c1e"}}
+                  , React.createElement('span', {style:{fontSize:15}}, "📷")
+                  , "Ta bild"
+                  , React.createElement('input', {
+                      type:"file", accept:"image/*", capture:"environment",
+                      style:{display:"none"},
+                      onChange: e => {
+                        const file = e.target.files[0];
+                        if (!file) return;
+                        const reader = new FileReader();
+                        reader.onload = ev => setEditAvatar(ev.target.result);
+                        reader.readAsDataURL(file);
+                        e.target.value = "";
+                      }})
+                )
+                /* Gallery — choose from device */
+                , React.createElement('label', {
+                    style:{
+                      display:"flex", alignItems:"center", gap:8, cursor:"pointer",
+                      background:"white", border:".5px solid rgba(0,0,0,0.1)",
+                      borderRadius:9, padding:"7px 12px", fontSize:12, fontWeight:700, color:"#1c1c1e"}}
+                  , React.createElement('span', {style:{fontSize:15}}, "🖼️")
+                  , "Välj från galleri"
+                  , React.createElement('input', {
+                      type:"file", accept:"image/*",
+                      style:{display:"none"},
+                      onChange: e => {
+                        const file = e.target.files[0];
+                        if (!file) return;
+                        const reader = new FileReader();
+                        reader.onload = ev => setEditAvatar(ev.target.result);
+                        reader.readAsDataURL(file);
+                        e.target.value = "";
+                      }})
+                )
+              )
+              /* Remove button */
+              , editAvatar && React.createElement('button', {
+                  onClick: () => setEditAvatar(null),
+                  style:{
+                    flexShrink:0, background:"#fff1f2", border:".5px solid #fecdd3",
+                    borderRadius:8, padding:"6px 10px", fontSize:12,
+                    fontWeight:700, color:"#b91c1c", cursor:"pointer"}},
+                  "✕ Ta bort")
             )
-            , React.createElement('button', { onClick: ()=>setEditChild(null),
-              style: {padding:"15px 20px",background:"rgba(0,0,0,0.04)",border:"none",
-                borderRadius:14,cursor:"pointer",fontWeight:700,fontSize:15}}, "Avbryt")
           )
+
+          /* Emoji — collapsed by default */
+          , React.createElement('label', { style: {display:"block", fontWeight:700, color:"#8e8e93", fontSize:11, marginBottom:6, letterSpacing:".06em", textTransform:"uppercase"}}, "Emoji")
+          , React.createElement('div', { style:{border:".5px solid rgba(0,0,0,0.1)", borderRadius:12, overflow:"hidden", marginBottom:16}}
+            /* Selected preview row — click to toggle */
+            , React.createElement('div', {
+                onClick: () => setEditShowEmoji(v => !v),
+                style:{
+                  display:"flex", alignItems:"center", justifyContent:"space-between",
+                  padding:"10px 14px", background:"#f8f7f5", cursor:"pointer"}}
+              , React.createElement('div', {style:{display:"flex", alignItems:"center", gap:10}}
+                , React.createElement('span', {style:{fontSize:26}}, editEmoji)
+                , React.createElement('span', {style:{fontSize:12, color:"#3c3c43", fontWeight:600}}, "Ändra emoji")
+              )
+              , React.createElement('span', {style:{
+                  fontSize:13, color:"#8e8e93",
+                  display:"inline-block",
+                  transform: editShowEmoji ? "rotate(180deg)" : "rotate(0deg)",
+                  transition:"transform 0.2s"}}, "▾")
+            )
+            /* Grid — only shown when open */
+            , editShowEmoji && React.createElement('div', { style:{
+                display:"grid", gridTemplateColumns:"repeat(8, 1fr)",
+                gap:2, padding:8, background:"white"}}
+              , EMOJIS.map(e =>
+                  React.createElement('button', { key: e, onClick: ()=>{ setEditEmoji(e); setEditShowEmoji(false); },
+                    style:{
+                      fontSize:24, background: e===editEmoji ? "#edeafb" : "transparent",
+                      border: e===editEmoji ? "2px solid #6c5cc8" : "2px solid transparent",
+                      borderRadius:8, padding:"8px 0", cursor:"pointer",
+                      lineHeight:1, textAlign:"center"}},
+                    e)
+                )
+            )
+          )
+
+          /* Kortfärg — collapsed by default */
+          , React.createElement('label', { style: {display:"block", fontWeight:700, color:"#8e8e93", fontSize:11, marginBottom:6, letterSpacing:".06em", textTransform:"uppercase"}}, "Kortfärg")
+          , React.createElement('div', {style:{marginBottom:24}}
+            , React.createElement(AddColorPicker, {value: editBg, onChange: (c) => { setEditBg(c); setEditShowColor(false); }})
+          )
+
+          /* Save + Cancel */
+          , React.createElement('div', { style: {display:"flex", gap:10, marginBottom:16}}
+            , React.createElement('button', { className:"btn-big", onClick: saveEdit,
+                style: {flex:1, background:"#6c5cc8", border:"none",
+                  borderRadius:12, padding:14, color:"white", fontWeight:800, fontSize:15, cursor:"pointer"}},
+                "💾 Spara")
+            , React.createElement('button', { onClick: ()=>{ setEditChild(null); setDeleteId(null); },
+                style: {padding:"14px 18px", background:"#f2f2f7", border:"none",
+                  borderRadius:12, cursor:"pointer", fontWeight:700, fontSize:14, color:"#3c3c43"}},
+                "Avbryt")
+          )
+
+          /* Divider */
+          , React.createElement('div', {style:{borderTop:".5px solid rgba(0,0,0,0.08)", marginBottom:16}})
+
+          /* Delete section */
+          , deleteId !== editChild.id
+            ? React.createElement('button', {
+                onClick: () => setDeleteId(editChild.id),
+                style:{
+                  width:"100%", background:"none", border:".5px solid #fecdd3",
+                  borderRadius:12, padding:"11px 14px", cursor:"pointer",
+                  display:"flex", alignItems:"center", justifyContent:"center", gap:8,
+                  color:"#b91c1c", fontWeight:700, fontSize:13}},
+                "🗑 Radera ", editChild.name)
+            : React.createElement('div', {style:{
+                background:"#fff1f2", border:".5px solid #fecdd3",
+                borderRadius:12, padding:"14px"}}
+              , React.createElement('div', {style:{fontWeight:800, color:"#b91c1c", fontSize:14, marginBottom:4}},
+                  "⚠️ Är du säker?")
+              , React.createElement('div', {style:{fontSize:12, color:"#9f1239", marginBottom:14, lineHeight:1.5}},
+                  "Detta går inte att ångra. All data för ", React.createElement('strong', null, editChild.name), " raderas permanent.")
+              , React.createElement('div', {style:{display:"flex", gap:8}}
+                , React.createElement('button', {
+                    onClick: () => { confirmDelete(editChild.id); setEditChild(null); },
+                    style:{
+                      flex:1, background:"#b91c1c", border:"none",
+                      borderRadius:10, padding:"10px", color:"white",
+                      fontWeight:800, fontSize:13, cursor:"pointer"}},
+                    "Ja, radera")
+                , React.createElement('button', {
+                    onClick: () => setDeleteId(null),
+                    style:{
+                      flex:1, background:"white", border:".5px solid rgba(0,0,0,0.1)",
+                      borderRadius:10, padding:"10px", color:"#3c3c43",
+                      fontWeight:700, fontSize:13, cursor:"pointer"}},
+                    "Avbryt")
+              )
+            )
         )
       )
 
