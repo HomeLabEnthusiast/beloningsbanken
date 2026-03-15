@@ -3304,100 +3304,26 @@ function TimerPanel({child, updateChild, showToast, activities, activityCategori
   const phase = timerState.phase    !== undefined ? timerState.phase    : "idle";
   // Ticking is handled globally in App — no local interval needed
 
-  const [earnChoice, setEarnChoice] = useState(null);
-
   const [celebrationGoal, setCelebrationGoal] = useState(null);
 
   const doStop = () => {
     if (secs < 5) { showToast("⚡ För kort! Fortsätt lite till!"); return; }
-    if (phase === "done") return; // already stopped — ignore repeat touch events
+    if (phase === "done") return;
     setTimerState(p => ({...p, running: false, phase: "done"}));
     const rawMins = Math.ceil(secs / 60);
     const mins = (act && act.rewardType === "fixed" && act.fixedMinutes) ? act.fixedMinutes : rawMins;
     const ratio = (act && act.pointRatio) ? act.pointRatio : 1;
     const fixedPts = (act && act.rewardType === "fixedPoints") ? (act.fixedPoints||10) : null;
-    setEarnChoice({mins, pointRatio: ratio, isFixed: !!(act && act.rewardType === "fixed"), fixedPts, rewardType: (act && act.rewardType) || "time", actId: act && act.id, actLabel: act && act.label, actIcon: act && act.icon});
-  };
-
-  const handleChooseTime = () => {
-    const {mins} = earnChoice;
-    const entry = {id:Date.now()+Math.random(), activity:act.id, label:act.label,
-      icon:act.icon, minutes:mins, date:new Date().toLocaleDateString("sv-SE")};
-    updateChild(child.id, {balance:child.balance+mins, history:[entry,...(child.history||[])]});
-    burst();
-    setEarnChoice(null);
-    doReset();
-    if (window._showVictory) {
-      const act = acts.find(a => a.id === earnChoice.actId) || {};
-      window._showVictory({
-        child, isReward: false,
-        activityEmoji: act.icon || "⏱️",
-        activityTitle: (act.label || "Aktivitet") + " klar!",
-        earnedMins: mins, earnedPoints: 0
-      });
-    } else {
-      showToast("🕐 +" + mins + " min skärmtid till " + child.name + "!");
-    }
-    if (window.sendNotification) {
-      const act = acts.find(a => a.id === earnChoice.actId) || {};
-      window.sendNotification(
-        child.name + " — Aktivitet klar! ⏱️",
-        (act.label || "Aktivitet") + " avslutad. +" + mins + " min skärmtid intjänad.",
-        ""
-      );
-    }
-    if (onDone) onDone(child.id);
-  };
-
-  const handleChoosePoints = (targetId) => {
-    const {mins, pointRatio, fixedPts} = earnChoice;
-    const pts = fixedPts !== null && fixedPts !== undefined ? fixedPts : Math.round(mins * (pointRatio || 1));
-    const targets = (child.targets || []);
-    let completedTarget = null;
-    const updatedTargets = targets.map(t => {
-      if (targetId && t.id !== targetId) return t;
-      if (!targetId && (t.pointsCollected||0) >= t.cost) return t;
-      const add = Math.min(pts, t.cost - (t.pointsCollected||0));
-      const done = (t.pointsCollected||0) + add >= t.cost;
-      if (done) completedTarget = {...t, pointsCollected: (t.pointsCollected||0)+add};
-      return {...t, pointsCollected:(t.pointsCollected||0)+add};
+    if (window._setEarnChoice) window._setEarnChoice({
+      childId: child.id, childObj: child, mins, pointRatio: ratio,
+      isFixed: !!(act && act.rewardType === "fixed"), fixedPts,
+      rewardType: (act && act.rewardType) || "time",
+      actId: act && act.id, actLabel: act && act.label, actIcon: act && act.icon
     });
-    const ptsAct = acts.find(a => a.id === earnChoice.actId) || {};
-    const ptsEntry = {id:Date.now()+Math.random(), activity: earnChoice.actId || ptsAct.id,
-      label: ptsAct.label || earnChoice.actLabel || "Aktivitet",
-      icon: ptsAct.icon || earnChoice.actIcon || "⭐",
-      points:pts, minutes:0, date:new Date().toLocaleDateString("sv-SE")};
-    updateChild(child.id, {points:(child.points||0)+pts, targets:updatedTargets, history:[ptsEntry,...(child.history||[])]});
-    burst();
-    setEarnChoice(null);
-    doReset();
-    if (window._showVictory) {
-      const act = acts.find(a => a.id === earnChoice.actId) || {};
-      window._showVictory({
-        child, isReward: false,
-        activityEmoji: act.icon || "⭐",
-        activityTitle: (act.label || "Aktivitet") + " klar!",
-        earnedMins: 0, earnedPoints: pts
-      });
-    }
-    if (onDone) onDone(child.id);
-    // Push notification for activity completion
-    if (window.sendNotification) {
-      const act = acts.find(a => a.id === earnChoice.actId) || {};
-      window.sendNotification(
-        child.name + " — Aktivitet klar! ⭐",
-        (act.label || "Aktivitet") + " avslutad. +" + pts + " poäng intjänade.",
-        ""
-      );
-    }
-    if (completedTarget) {
-      setTimeout(() => { burst(); setCelebrationGoal(completedTarget); }, 400);
-    } else {
-      const targetName = targetId ? (targets.find(t=>t.id===targetId)||{}).name : null;
-      showToast("⭐ +" + pts + " poäng" + (targetName ? " mot " + targetName : "") + "!");
-    }
   };
 
+  // earnChoice is now handled globally in App via window._setEarnChoice
+  // doReset is still needed locally for state cleanup
   const doReset = () =>
     setTimerState({seconds: 0, running: false, activity: acts.length > 0 ? acts[0] : null, phase: "idle"});
 
@@ -3498,16 +3424,6 @@ function TimerPanel({child, updateChild, showToast, activities, activityCategori
         )
       )
 
-      , earnChoice && (
-        React.createElement(EarnChoiceDialog, { child: child, mins: earnChoice.mins,
-          pointRatio: earnChoice.pointRatio,
-          fixedPts: earnChoice.fixedPts || null,
-          rewardType: earnChoice.rewardType || "time",
-          onChooseTime: handleChooseTime,
-          onChoosePoints: handleChoosePoints,
-          onHome: () => { setEarnChoice(null); doReset(); if (onDone) onDone(child.id); },
-          onRestart: () => { setEarnChoice(null); doReset(); }})
-      )
       , celebrationGoal && (
         React.createElement(GoalCelebration, {
           child: child,
@@ -3520,7 +3436,7 @@ function TimerPanel({child, updateChild, showToast, activities, activityCategori
 }
 
 /* ═══════════════ TIMER VIEW (single child) ═════════════════════════════════ */
-function TimerView({child, updateChild, showToast, activities, activityCategories, timerStates, setTimerStates, setView}) {
+function TimerView({child, updateChild, showToast, activities, activityCategories, timerStates, setTimerStates, setView, onDone}) {
   if (!child) return (
     React.createElement('div', { style: {padding:32,textAlign:"center",color:"#8e8e93"}}, "Inget barn valt.")
   );
@@ -3545,41 +3461,8 @@ function TimerView({child, updateChild, showToast, activities, activityCategorie
     }));
 
   const [selectedCategory, setSelectedCategory] = React.useState(null);
-  const [earnChoice, setEarnChoice] = React.useState(null);
-  React.useEffect(() => {
-    window._setEarnChoice = setEarnChoice;
-    return () => { delete window._setEarnChoice; };
-  }, []);
+  // earnChoice is now handled globally in App via window._setEarnChoice
 
-  const handleEarnTime = () => {
-    if (!earnChoice) return;
-    const {mins} = earnChoice;
-    const entry = {id:Date.now()+Math.random(), activity:(earnChoice.actId||"unknown"),
-      label:(earnChoice.actLabel||"Aktivitet"), icon:(earnChoice.actIcon||"⭐"),
-      minutes:mins, date:new Date().toLocaleDateString("sv-SE")};
-    updateChild(child.id, {balance:child.balance+mins, history:[entry,...(child.history||[])]});
-    burst();
-    setEarnChoice(null);
-    setTimerState({seconds:0, running:false, activity:timerState.activity, phase:"idle"});
-    if (window._showVictory) {
-      const actObj = acts.find(a => a.id === earnChoice.actId) || {};
-      window._showVictory({ child, isReward:false,
-        activityEmoji: actObj.icon || earnChoice.actIcon || "⏱️",
-        activityTitle: (actObj.label || earnChoice.actLabel || "Aktivitet") + " klar!",
-        earnedMins: mins, earnedPoints: 0, standalone: true });
-    }
-  };
-
-  const handleEarnPoints = (pts) => {
-    if (!earnChoice) return;
-    const entry = {id:Date.now()+Math.random(), activity:(earnChoice.actId||"unknown"),
-      label:(earnChoice.actLabel||"Aktivitet"), icon:(earnChoice.actIcon||"⭐"),
-      minutes:0, points:pts, date:new Date().toLocaleDateString("sv-SE")};
-    updateChild(child.id, {points:(child.points||0)+pts, history:[entry,...(child.history||[])]});
-    burst();
-    setEarnChoice(null);
-    setTimerState({seconds:0, running:false, activity:timerState.activity, phase:"idle"});
-  };
   const timerRunning = timerState.phase === "running" || timerState.phase === "paused";
 
   const resolvedCategory = selectedCategory || (() => {
@@ -3852,42 +3735,13 @@ function TimerView({child, updateChild, showToast, activities, activityCategorie
                   const mins = (act && act.rewardType === "fixed" && act.fixedMinutes) ? act.fixedMinutes : rawMins;
                   const ratio = (act && act.pointRatio) ? act.pointRatio : 1;
                   const fixedPts = (act && act.rewardType === "fixedPoints") ? (act.fixedPoints||10) : null;
-                  if (window._setEarnChoice) window._setEarnChoice({mins, pointRatio:ratio, isFixed:!!(act && act.rewardType === "fixed"), fixedPts, rewardType:(act && act.rewardType)||"time", actId: act && act.id, actLabel: act && act.label, actIcon: act && act.icon});
+                  if (window._setEarnChoice) window._setEarnChoice({childId: child.id, childObj: child, mins, pointRatio:ratio, isFixed:!!(act && act.rewardType === "fixed"), fixedPts, rewardType:(act && act.rewardType)||"time", actId: act && act.id, actLabel: act && act.label, actIcon: act && act.icon});
                 },
                 color: "#b91c1c", compact: true, pillBar: true})
           )
         )
       )
 
-      /* EarnChoice modal */
-      , earnChoice && React.createElement(EarnChoiceDialog, {
-          child: child,
-          mins: earnChoice.mins,
-          pointRatio: earnChoice.pointRatio,
-          isFixed: earnChoice.isFixed,
-          fixedPts: earnChoice.fixedPts,
-          rewardType: earnChoice.rewardType || "time",
-          actId: earnChoice.actId,
-          actLabel: earnChoice.actLabel,
-          actIcon: earnChoice.actIcon,
-          updateChild: updateChild,
-          showToast: showToast,
-          onChooseTime: handleEarnTime,
-          onChoosePoints: handleEarnPoints,
-          onHome: () => {
-            setEarnChoice(null);
-            setTimerState({seconds:0, running:false, activity:timerState.activity, phase:"idle"});
-            if (setView) setView("home");
-          },
-          onRestart: () => {
-            setEarnChoice(null);
-            setTimerState({seconds:0, running:false, activity:timerState.activity, phase:"idle"});
-          },
-          onDismiss: () => {
-            setEarnChoice(null);
-            setTimerState({seconds:0, running:false, activity:timerState.activity, phase:"idle"});
-          }
-        })
     )
   );
 }
@@ -3996,8 +3850,8 @@ function AddThemePicker({value, onChange}) {
   );
 }
 
-function SplitKidCard({kid, timerState, setTimerState, acts, showToast, updateChild, setView, setSplitSessionIds}) {
-  const col = (() => { const t = getTheme(kid); return {bg:t.bg, border:t.border, accent:t.accent, chip:t.chip, chipText:t.chipText}; })();
+const SplitKidCard = React.memo(function SplitKidCard({kid, timerState, setTimerState, acts, showToast, updateChild, setView, setSplitSessionIds, setActiveChild, kidList, timerStates}) {
+  const col = (() => { const t = getTheme(kid); return {bg:t.bg, border:t.border, accent:t.accent, chip:t.chip, chipText:t.chipText, headerBg:t.headerBg}; })();
   const blank = {seconds:0, running:false, activity:acts[0], phase:"idle"};
   const [earnChoice, setEarnChoice] = React.useState(null);
   const firedRef = React.useRef(false);
@@ -4015,12 +3869,20 @@ function SplitKidCard({kid, timerState, setTimerState, acts, showToast, updateCh
     if (phase === "idle") firedRef.current = false;
   }, [phase]);
 
-  /* ── IDLE card ── */
+  /* ── IDLE card — shown after deposit or before starting ── */
   if (hasNoActiveTimer) {
+    // Find other kids that still have active timers
+    const othersActive = (kidList||[]).filter(k =>
+      k.id !== kid.id &&
+      timerStates && timerStates[k.id] &&
+      (timerStates[k.id].phase === "running" || timerStates[k.id].phase === "paused")
+    );
+    const nextKid = othersActive[0] || null;
+
     return React.createElement('div', { style: {
         flex:"1 1 300px", minWidth:0, background:"white",
         border:".5px solid rgba(0,0,0,0.08)", borderRadius:16,
-        overflow:"hidden", opacity:0.85}}
+        overflow:"hidden"}}
       , React.createElement('div', { style: {
           background: col.headerBg||col.accent, padding:"14px 14px 16px",
           display:"flex", alignItems:"center", gap:10}}
@@ -4028,29 +3890,42 @@ function SplitKidCard({kid, timerState, setTimerState, acts, showToast, updateCh
             width:40, height:40, borderRadius:"50%", flexShrink:0,
             background:"rgba(255,255,255,0.2)",
             border:"2px solid rgba(255,255,255,0.5)",
-            display:"flex", alignItems:"center", justifyContent:"center", fontSize:22}},
-          kid.emoji)
-        , React.createElement('div', null
+            display:"flex", alignItems:"center", justifyContent:"center", fontSize:22, overflow:"hidden"}},
+          kid.avatar
+            ? React.createElement('img', {src:kid.avatar, style:{width:"100%",height:"100%",objectFit:"cover"}})
+            : kid.emoji)
+        , React.createElement('div', {style:{flex:1}}
           , React.createElement('div', { style: {fontSize:15, fontWeight:800, color:"white", letterSpacing:"-.3px"}}, kid.name)
-          , React.createElement('div', { style: {fontSize:11, color:"rgba(255,255,255,0.65)", fontWeight:500, marginTop:1}}, "Redo att starta")
+          , React.createElement('div', { style: {fontSize:11, color:"rgba(255,255,255,0.7)", fontWeight:500, marginTop:1}},
+              "✅ Klar")
         )
       )
       , React.createElement('div', { style: {
-          padding:"20px 16px", display:"flex", flexDirection:"column",
-          alignItems:"center", gap:10, textAlign:"center"}}
-        , React.createElement('div', { style: {fontSize:11, color:"#8e8e93", lineHeight:1.5}},
-          "Ingen aktiv aktivitet")
-        , React.createElement('button', {
+          padding:"16px", display:"flex", flexDirection:"column", gap:8}})
+
+        /* If others are still active — show continue button prominently */
+        , nextKid && React.createElement('button', {
             onClick: () => {
               setSplitSessionIds(prev => prev.filter(id => id !== kid.id));
-              setView("timer");
+              if (setActiveChild) setActiveChild(nextKid.id);
             },
             style: {
-              background: col.accent, border:"none", borderRadius:50,
-              padding:"7px 18px", color:"white", fontWeight:700,
-              fontSize:12, cursor:"pointer"}},
-          "▶ Starta aktivitet")
-      )
+              width:"100%", background: col.headerBg||col.accent, border:"none",
+              borderRadius:12, padding:"13px 16px", cursor:"pointer",
+              display:"flex", alignItems:"center", justifyContent:"center", gap:8,
+              color:"white", fontWeight:800, fontSize:14}},
+          "↩ Fortsätt med " + nextKid.name)
+
+        /* Home button — always shown, doesn't stop other timers */
+        , React.createElement('button', {
+            onClick: () => setView("home"),
+            style: {
+              width:"100%", background:"#f2f2f7",
+              border:".5px solid rgba(0,0,0,0.08)", borderRadius:12,
+              padding:"11px 16px", cursor:"pointer",
+              display:"flex", alignItems:"center", justifyContent:"center", gap:8,
+              color:"#3c3c43", fontWeight:700, fontSize:13}},
+          "🏠 Hem")
     );
   }
 
@@ -4180,48 +4055,29 @@ function SplitKidCard({kid, timerState, setTimerState, acts, showToast, updateCh
                 const mins = (act && act.rewardType === "fixed" && act.fixedMinutes) ? act.fixedMinutes : rawMins;
                 const ratio = (act && act.pointRatio) ? act.pointRatio : 1;
                 const fixedPts = (act && act.rewardType === "fixedPoints") ? (act.fixedPoints||10) : null;
-                setEarnChoice({mins, pointRatio:ratio,
-                  isFixed:!!(act&&act.rewardType==="fixed"), fixedPts,
-                  rewardType:(act&&act.rewardType)||"time",
-                  actId:act&&act.id, actLabel:act&&act.label, actIcon:act&&act.icon});
+                if (window._setEarnChoice) window._setEarnChoice({
+                  childId: kid.id, childObj: kid, mins, pointRatio: ratio,
+                  isFixed: !!(act && act.rewardType === "fixed"), fixedPts,
+                  rewardType: (act && act.rewardType) || "time",
+                  actId: act && act.id, actLabel: act && act.label, actIcon: act && act.icon
+                });
               },
               color:"#b91c1c", compact:true, pillBar:true})
         )
       )
     )
 
-    /* EarnChoiceDialog — owned by THIS card, isolated from timer ticks */
-    , earnChoice && React.createElement(EarnChoiceDialog, {
-        key: kid.id+"_earn",
-        child: kid, mins: earnChoice.mins, pointRatio: earnChoice.pointRatio,
-        fixedPts: earnChoice.fixedPts, rewardType: earnChoice.rewardType || "time",
-        onChooseTime: () => {
-          const entry = {id:Date.now()+Math.random(), activity:(earnChoice.actId||"unknown"),
-            label:(earnChoice.actLabel||"Aktivitet"), icon:(earnChoice.actIcon||"⭐"),
-            minutes:earnChoice.mins, date:new Date().toLocaleDateString("sv-SE")};
-          updateChild(kid.id, {balance:kid.balance+earnChoice.mins, history:[entry,...(kid.history||[])]});
-          burst();
-          setEarnChoice(null);
-          setTimerState(blank);
-          if (window._showVictory) window._showVictory({ child:kid, isReward:false,
-            activityEmoji: earnChoice.actIcon||"⏱️",
-            activityTitle: (earnChoice.actLabel||"Aktivitet")+" klar!",
-            earnedMins: earnChoice.mins, earnedPoints:0, standalone:true });
-        },
-        onChoosePoints: (pts) => {
-          const entry = {id:Date.now()+Math.random(), activity:(earnChoice.actId||"unknown"),
-            label:(earnChoice.actLabel||"Aktivitet"), icon:(earnChoice.actIcon||"⭐"),
-            minutes:0, points:pts, date:new Date().toLocaleDateString("sv-SE")};
-          updateChild(kid.id, {points:(kid.points||0)+pts, history:[entry,...(kid.history||[])]});
-          burst();
-          setEarnChoice(null);
-          setTimerState(blank);
-        },
-        onHome: () => { setEarnChoice(null); setTimerState(blank); setView("home"); },
-        onRestart: () => { setEarnChoice(null); setTimerState(blank); firedRef.current = false; }
-      })
   );
-}
+}, (prev, next) => {
+  // Don't re-render when earnChoice is open — prevents blink from timer ticks
+  if (prev.kid.id !== next.kid.id) return false;
+  // Always re-render if earnChoice state might have changed (check via timerState.phase)
+  if (prev.timerState.phase !== next.timerState.phase) return false;
+  // If done/idle phase (dialog might be open) — block re-render from second ticks
+  if (next.timerState.phase === "done" || next.timerState.phase === "idle") return true;
+  // Otherwise allow normal re-render (running/paused — need second updates)
+  return false;
+});
 
 function SplitTimerView({kidList, updateChild, showToast, activities, activityCategories, timerStates, setTimerStates, setView, setActiveChild, setSplitSessionIds}) {
   const cats = (activityCategories && activityCategories.length)
@@ -4249,7 +4105,8 @@ function SplitTimerView({kidList, updateChild, showToast, activities, activityCa
           return React.createElement(SplitKidCard, {
             key: kid.id,
             kid, timerState, setTimerState, acts,
-            showToast, updateChild, setView, setSplitSessionIds
+            showToast, updateChild, setView, setSplitSessionIds,
+            setActiveChild, kidList, timerStates
           });
         })
       )
@@ -7971,9 +7828,79 @@ function ChangePinSection({showToast}) {
 }
 
 /* ═══════════════ APP ROOT ══════════════════════════════════════════════════ */
+/* StableEarnDialog — React.memo with stable identity. Only shown when showEarnDialog=true.
+   closeEarnDialog resets both ref and boolean — no ghost modals possible. */
+const StableEarnDialog = React.memo(function StableEarnDialog({
+  earnChoiceRef, data, updateChild, timerStates, setTimerStates, setView, closeEarnDialog, showVictory, burst
+}) {
+  const ec = earnChoiceRef.current;
+  if (!ec) return null;
+  const childObj = (data.children||[]).find(c => c.id === ec.childId) || ec.childObj;
+  if (!childObj) return null;
+
+  const resetTimer = () => {
+    setTimerStates(prev => ({...prev,
+      [childObj.id]: {seconds:0, running:false,
+        activity: (prev[childObj.id]||{}).activity || null, phase:"idle"}
+    }));
+    closeEarnDialog();
+  };
+  const checkGoHome = () => {
+    const stillActive = Object.entries(timerStates).some(([id, ts]) =>
+      id !== childObj.id && ts && (ts.phase==="running"||ts.phase==="paused")
+    );
+    if (!stillActive) setView("home");
+  };
+
+  return React.createElement(EarnChoiceDialog, {
+    child: childObj,
+    mins: ec.mins, pointRatio: ec.pointRatio,
+    fixedPts: ec.fixedPts, rewardType: ec.rewardType || "time",
+    onChooseTime: () => {
+      const entry = {id:Date.now()+Math.random(),
+        activity:ec.actId||"unknown", label:ec.actLabel||"Aktivitet",
+        icon:ec.actIcon||"⭐", minutes:ec.mins,
+        date:new Date().toLocaleDateString("sv-SE")};
+      updateChild(childObj.id, {balance:(childObj.balance||0)+ec.mins, history:[entry,...(childObj.history||[])]});
+      burst();
+      resetTimer();
+      showVictory({child:childObj, isReward:false, activityEmoji:ec.actIcon||"⏱️",
+        activityTitle:(ec.actLabel||"Aktivitet")+" klar!", earnedMins:ec.mins, earnedPoints:0});
+      checkGoHome();
+    },
+    onChoosePoints: (targetId) => {
+      const pts = ec.fixedPts !== null && ec.fixedPts !== undefined
+        ? ec.fixedPts : Math.round(ec.mins * (ec.pointRatio || 1));
+      const targets = (childObj.targets||[]);
+      let completedTarget = null;
+      const updatedTargets = targets.map(t => {
+        if (targetId && t.id !== targetId) return t;
+        if (!targetId && (t.pointsCollected||0) >= t.cost) return t;
+        const add = Math.min(pts, t.cost-(t.pointsCollected||0));
+        const done = (t.pointsCollected||0)+add >= t.cost;
+        if (done) completedTarget = {...t, pointsCollected:(t.pointsCollected||0)+add};
+        return {...t, pointsCollected:(t.pointsCollected||0)+add};
+      });
+      const entry = {id:Date.now()+Math.random(),
+        activity:ec.actId||"unknown", label:ec.actLabel||"Aktivitet",
+        icon:ec.actIcon||"⭐", minutes:0, points:pts,
+        date:new Date().toLocaleDateString("sv-SE")};
+      updateChild(childObj.id, {points:(childObj.points||0)+pts, targets:updatedTargets, history:[entry,...(childObj.history||[])]});
+      burst();
+      resetTimer();
+      showVictory({child:childObj, isReward:false, activityEmoji:ec.actIcon||"⭐",
+        activityTitle:(ec.actLabel||"Aktivitet")+" klar!", earnedMins:0, earnedPoints:pts});
+      if (completedTarget) setTimeout(()=>burst(), 400);
+      checkGoHome();
+    },
+    onHome: () => { resetTimer(); setView("home"); },
+    onRestart: () => { resetTimer(); }
+  });
+}, () => true); // never re-render from parent — dialog manages its own lifecycle
+
 function App() {
   const [data,          setData]          = useState(loadData);
-  const [view,          setView]          = useState(() => {
+  const [view,          setViewRaw]       = useState(() => {
     const saved = loadSession();
     // Only restore non-home views if there's an active session to go back to
     if (saved && saved.view && saved.view !== "home") {
@@ -7983,6 +7910,12 @@ function App() {
     }
     return "home";
   });
+  // setView always closes earn dialog to prevent ghost modals
+  const setView = (v) => {
+    earnChoiceRef.current = null;
+    setShowEarnDialog(false);
+    setViewRaw(v);
+  };
   const [activeChild,   setActiveChild]   = useState(() => {
     const saved = loadSession();
     return (saved && saved.activeChild) ? saved.activeChild : null;
@@ -8001,8 +7934,23 @@ function App() {
   const [victoryCard,   setVictoryCard]   = useState(null); // {emoji,title,lines:[]}
   const [adminUnlocked, setAdminUnlocked] = useState(false);
   const [routineFromSplit, setRoutineFromSplit] = useState(false);
+  const earnChoiceRef = useRef(null);
+  const [showEarnDialog, setShowEarnDialog] = useState(false);
   const toastTimer   = useRef(null);
   const victoryTimer = useRef(null);
+
+  useEffect(() => {
+    window._setEarnChoice = (ec) => {
+      earnChoiceRef.current = ec;
+      setShowEarnDialog(true);
+    };
+    return () => { delete window._setEarnChoice; };
+  }, []);
+
+  const closeEarnDialog = () => {
+    earnChoiceRef.current = null;
+    setShowEarnDialog(false);
+  };
 
   useEffect(() => saveData(data), [data]);
 
@@ -8388,7 +8336,14 @@ function App() {
             ? data.activityCategories
             : DEFAULT_ACTIVITY_CATEGORIES,
           timerStates: timerStates, setTimerStates: setTimerStates,
-          setView: setView})
+          setView: setView,
+          onDone: () => {
+            // After deposit: if no active timers remain anywhere, go home
+            const stillActive = Object.values(timerStates).some(ts =>
+              ts && (ts.phase === "running" || ts.phase === "paused")
+            );
+            if (!stillActive) setView("home");
+          }})
       )
       , effectiveView === "split-timer" && (
         React.createElement(SplitTimerView, {
@@ -8603,6 +8558,19 @@ function App() {
           rewardLabel:    victoryCard.rewardLabel,
           manual:         victoryCard.manual || false,
           onDismiss: () => setVictoryCard(null)
+        })
+
+      /* ── Stable EarnChoiceDialog — controlled by showEarnDialog, never triggered by timer ticks ── */
+      , showEarnDialog && React.createElement(StableEarnDialog, {
+          earnChoiceRef: earnChoiceRef,
+          data: data,
+          updateChild: updateChild,
+          timerStates: timerStates,
+          setTimerStates: setTimerStates,
+          setView: setView,
+          closeEarnDialog: closeEarnDialog,
+          showVictory: showVictory,
+          burst: burst
         })
     )
   );
