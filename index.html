@@ -52,18 +52,12 @@
     .action-btn{transition:background 0.15s,transform 0.12s;-webkit-tap-highlight-color:transparent;user-select:none;}
     .action-btn:hover{background:var(--action-hover-bg)!important;}
     .action-btn:active{transform:scale(0.93);background:var(--action-active-bg)!important;}
+    .drag-item{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent;}
     .hold-stop{
       -webkit-touch-callout:none;
       -webkit-user-select:none;
       user-select:none;
       touch-action:none;
-      -webkit-tap-highlight-color:transparent;
-    }
-    .drag-item{
-      -webkit-touch-callout:none;
-      -webkit-user-select:none;
-      user-select:none;
-      touch-action:pan-y;
       -webkit-tap-highlight-color:transparent;
     }
     @media(min-width:640px){.split-timer-grid{flex-direction:row!important;align-items:flex-start!important;}}
@@ -5929,72 +5923,30 @@ function TemplatesAdmin({data, setData, showToast, getCats}) {
       , tSteps.length > 0 && React.createElement("div", {style:{fontSize:11, color:"#8e8e93",
           fontWeight:600, marginBottom:8}}, "Dra för att ändra ordning")
 
-      /* Step list with touch-friendly drag & drop — works on iOS/Android */
+      /* Step list with drag & drop */
       , (() => {
-          const dragState = {idx:null, over:null, startY:0, dragging:false};
-
-          const onTouchStart = (i, e) => {
-            e.preventDefault(); // prevents iOS context menu popup
-            dragState.idx = i;
-            dragState.startY = e.touches[0].clientY;
-            dragState.dragging = true;
-          };
-
-          const onTouchMove = (e) => {
-            if (!dragState.dragging) return;
-            e.preventDefault();
-            const y = e.touches[0].clientY;
-            const els = e.currentTarget.closest("[data-draglist]") &&
-              Array.from(e.currentTarget.closest("[data-draglist]").children);
-            if (!els) return;
-            let over = dragState.idx;
-            for (let j = 0; j < els.length; j++) {
-              const rect = els[j].getBoundingClientRect();
-              if (y >= rect.top && y <= rect.bottom) { over = j; break; }
-            }
-            dragState.over = over;
-          };
-
-          const onTouchEnd = () => {
-            if (!dragState.dragging) return;
-            dragState.dragging = false;
-            if (dragState.idx !== null && dragState.over !== null && dragState.idx !== dragState.over) {
-              const arr = [...tSteps];
-              const [m] = arr.splice(dragState.idx, 1);
-              arr.splice(dragState.over, 0, m);
-              setTSteps(arr);
-            }
-            dragState.idx = null; dragState.over = null;
-          };
-
-          return tSteps.length > 0 && React.createElement("div", {
-            "data-draglist": true,
-            style:{marginBottom:12}}
+          const dragState = {idx:null, over:null};
+          return tSteps.length > 0 && React.createElement("div", {style:{marginBottom:12}}
             , tSteps.map((step, i) =>
                 React.createElement("div", {key:i,
-                  draggable: true,
-                  onDragStart: () => { dragState.idx = i; },
-                  onDragEnter: () => { dragState.over = i; },
-                  onDragEnd: () => {
-                    if (dragState.idx===null||dragState.over===null||dragState.idx===dragState.over) return;
+                  draggable:true,
+                  onDragStart:()=>{dragState.idx=i;},
+                  onDragEnter:()=>{dragState.over=i;},
+                  onDragEnd:()=>{
+                    if(dragState.idx===null||dragState.over===null||dragState.idx===dragState.over)return;
                     const arr=[...tSteps];
                     const [m]=arr.splice(dragState.idx,1);
                     arr.splice(dragState.over,0,m);
                     setTSteps(arr);
-                    dragState.idx=null; dragState.over=null;
+                    dragState.idx=null;dragState.over=null;
                   },
-                  onDragOver: e => e.preventDefault(),
-                  onContextMenu: e => e.preventDefault(),
-                  onTouchStart: e => onTouchStart(i, e),
-                  onTouchMove: onTouchMove,
-                  onTouchEnd: onTouchEnd,
+                  onDragOver:e=>e.preventDefault(),
+                  onContextMenu:e=>e.preventDefault(),
+                  className:"drag-item",
                   style:{display:"flex", alignItems:"flex-start", gap:8,
                     padding:"10px 12px", marginBottom:6,
                     background:"#f8f7f5", borderRadius:12,
-                    border:".5px solid rgba(0,0,0,0.07)",
-                    cursor:"grab",
-                    WebkitUserSelect:"none", userSelect:"none",
-                    WebkitTouchCallout:"none"}, className:"drag-item"}
+                    border:".5px solid rgba(0,0,0,0.07)", cursor:"grab"}}
                   , React.createElement("span", {style:{fontSize:13, color:"#c7c7cc", marginTop:2, flexShrink:0}}, "⠿")
                   , React.createElement("span", {style:{fontSize:18, flexShrink:0, marginTop:1}}, step.icon)
                   , React.createElement("div", {style:{flex:1, minWidth:0}}
@@ -7123,7 +7075,7 @@ function SettingsView({data, setData, showToast, timerStates, setTimerStates, on
             const catActs = [...(liveCat.activities || [])].sort((a,b) => a.label.localeCompare(b.label, "sv"));
 
             // Drag state — plain mutable object, no hooks inside IIFE
-            const dragState = {idx: null, over: null, dragging: false};
+            const dragState = {idx: null, over: null};
 
             const handleDragStart = (i) => { dragState.idx = i; };
             const handleDragEnter = (i) => { dragState.over = i; };
@@ -7132,33 +7084,11 @@ function SettingsView({data, setData, showToast, timerStates, setTimerStates, on
               const newActs = [...catActs];
               const [moved] = newActs.splice(dragState.idx, 1);
               newActs.splice(dragState.over, 0, moved);
+              // Save back
               const updatedCats = getCats().map(c => c.id === liveCat.id ? {...c, activities: newActs} : c);
               setData(d => ({...d, activityCategories: updatedCats}));
               dragState.idx = null; dragState.over = null;
             };
-
-            const handleTouchStart = (i, e) => {
-              e.preventDefault();
-              dragState.idx = i; dragState.dragging = true;
-            };
-            const handleTouchMove = (e, listEl) => {
-              if (!dragState.dragging) return;
-              e.preventDefault();
-              const y = e.touches[0].clientY;
-              if (!listEl) return;
-              const els = Array.from(listEl.children);
-              for (let j = 0; j < els.length; j++) {
-                const rect = els[j].getBoundingClientRect();
-                if (y >= rect.top && y <= rect.bottom) { dragState.over = j; break; }
-              }
-            };
-            const handleTouchEnd = () => {
-              if (!dragState.dragging) return;
-              dragState.dragging = false;
-              handleDrop();
-            };
-
-            let actListEl = null;
 
             const actFormFields = (isNew) => [
               /* Ikon */
@@ -7212,7 +7142,6 @@ function SettingsView({data, setData, showToast, timerStates, setTimerStates, on
                     "Sorterade A–Ö  ·  Dra för att ändra ordning")
 
                 /* Activity list with drag & drop */
-                , React.createElement('div', {ref: el => { actListEl = el; }}
                 , catActs.map((act, ai) =>
                     React.createElement('div', {key:act.id,
                       draggable: !(editActInCat && editActInCat.id===act.id),
@@ -7221,14 +7150,10 @@ function SettingsView({data, setData, showToast, timerStates, setTimerStates, on
                       onDragEnd: handleDrop,
                       onDragOver: e=>e.preventDefault(),
                       onContextMenu: e=>e.preventDefault(),
-                      onTouchStart: e=>handleTouchStart(ai, e),
-                      onTouchMove: e=>handleTouchMove(e, actListEl),
-                      onTouchEnd: handleTouchEnd,
+                      className:"drag-item",
                       style:{background:"#ffffff",borderRadius:12,padding:"10px 12px",marginBottom:6,
                         border:".5px solid "+(editActInCat&&editActInCat.id===act.id?(liveCat.color||"#6c5cc8"):"rgba(0,0,0,0.08)"),
-                        cursor:"grab",
-                        WebkitUserSelect:"none", userSelect:"none",
-                        WebkitTouchCallout:"none"}, className:"drag-item"}
+                        cursor:"grab"}}
 
                       , editActInCat && editActInCat.id===act.id
                         ? React.createElement('div', null, ...actFormFields(false))
@@ -7260,10 +7185,9 @@ function SettingsView({data, setData, showToast, timerStates, setTimerStates, on
 
                 /* Add button */
                 , !editActInCat && React.createElement('button', {className:"btn-big",onClick:()=>setEditActInCat({id:"act"+Date.now(),label:"",icon:"⭐",rewardType:"time",pointRatio:1}),style:{width:"100%",background:"#edeafb",border:".5px solid #d0caee",borderRadius:12,padding:"11px",color:"#6c5cc8",fontWeight:800,fontSize:13,cursor:"pointer",marginTop:4}}, "+ Ny aktivitet i "+liveCat.label)
-              ) /* close fade-up */
-              ) /* close actListEl wrapper */
-            )
-          );
+              )
+            );
+          }
           return null;
         })()
 
@@ -7297,39 +7221,26 @@ function SettingsView({data, setData, showToast, timerStates, setTimerStates, on
           , React.createElement('div', {style:{fontSize:11, color:"#8e8e93", fontWeight:600, marginBottom:8}},
               "Dra för att ändra ordning")
           , (() => {
-              const dragState = {idx:null, over:null, dragging:false};
-              let rewListEl = null;
-              const doRewardDrop = () => {
-                if (dragState.idx===null||dragState.over===null||dragState.idx===dragState.over) return;
-                const newList=[...rewards];
-                const [moved]=newList.splice(dragState.idx,1);
-                newList.splice(dragState.over,0,moved);
-                setData(d=>({...d,rewards:newList}));
-                dragState.idx=null; dragState.over=null;
-              };
-              return React.createElement('div', {ref: el => { rewListEl = el; }}
-              , rewards.map((r, ri) =>
+              const dragState = {idx:null, over:null};
+              return rewards.map((r, ri) =>
                 React.createElement('div', {
                   key: r.id,
                   draggable: !(_optionalChain([editRew, 'optionalAccess', _14 => _14.id])===r.id),
                   onDragStart: ()=>{ dragState.idx=ri; },
                   onDragEnter: ()=>{ dragState.over=ri; },
-                  onDragEnd: doRewardDrop,
+                  onDragEnd: ()=>{
+                    if (dragState.idx===null||dragState.over===null||dragState.idx===dragState.over) return;
+                    const newList=[...rewards];
+                    const [moved]=newList.splice(dragState.idx,1);
+                    newList.splice(dragState.over,0,moved);
+                    setData(d=>({...d,rewards:newList}));
+                    dragState.idx=null; dragState.over=null;
+                  },
                   onDragOver: e=>e.preventDefault(),
                   onContextMenu: e=>e.preventDefault(),
-                  onTouchStart: e=>{ e.preventDefault(); dragState.idx=ri; dragState.dragging=true; },
-                  onTouchMove: e=>{ if(!dragState.dragging)return; e.preventDefault();
-                    const y=e.touches[0].clientY;
-                    if(!rewListEl)return;
-                    Array.from(rewListEl.children).forEach((el,j)=>{
-                      const rect=el.getBoundingClientRect();
-                      if(y>=rect.top&&y<=rect.bottom) dragState.over=j;
-                    });
-                  },
-                  onTouchEnd: ()=>{ if(!dragState.dragging)return; dragState.dragging=false; doRewardDrop(); },
+                  className:"drag-item",
                   style:{background:"white", borderRadius:14, padding:"12px 14px",
-                    marginBottom:8, border:".5px solid rgba(0,0,0,0.08)", cursor:"grab",
-                    WebkitUserSelect:"none", userSelect:"none", WebkitTouchCallout:"none"}, className:"drag-item"}
+                    marginBottom:8, border:".5px solid rgba(0,0,0,0.08)", cursor:"grab"}}
 
                   , _optionalChain([editRew, 'optionalAccess', _15 => _15.id])===r.id
                     /* Edit form */
@@ -7372,7 +7283,7 @@ function SettingsView({data, setData, showToast, timerStates, setTimerStates, on
                             onCancel:()=>setDeleteRewId(null)})
                       )
                 )
-              )); /* close rewListEl wrapper */
+              );
             })()
         )
       )
