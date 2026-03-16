@@ -111,7 +111,7 @@ function _optionalChain(ops) { let lastAccessLHS = undefined; let value = ops[0]
 const { useState, useEffect, useRef } = React;
 
 /* ─── CONSTANTS ─────────────────────────────────────────────────────────── */
-const EMOJIS    = ["🦁","🐸","🦊","🐼","🦋","🐬","🦄","🐉","🐨","🐯","🐻","🦖","🐧","🦒","🦓","🐙"];
+const EMOJIS    = ["🦁","🐸","🦊","🐼","🦋","🐬","🦄","🐉","🐨","🐯","🐻","🦖","🐧","🦒","🦓","🐙","🦅","🦚","🦜","🐺","🦝","🐻‍❄️","🦁","🐮","🐷","🦔","🐿️","🦡","🦦","🐝","🦋","🌟","⭐","🌈","❤️","🎉","🏆","💫","🎨"];
 const BG_COLORS = [
   // Röd-Orange-Guld
   "#ac1917","#b75420","#c0982b",
@@ -273,9 +273,18 @@ const clearSession = () => { try { localStorage.removeItem(SESSION_KEY); } catch
 const loadData = () => {
   try {
     const d = JSON.parse(localStorage.getItem(LS_KEY));
-    if (d) return d;
+    if (d) {
+      // Migration: if emojiLibrary is empty or missing, seed from EMOJI_GROUPS
+      if ((!d.emojiLibrary || d.emojiLibrary.length === 0) && typeof EMOJI_GROUPS !== "undefined") {
+        d.emojiLibrary = EMOJI_GROUPS.map(g => ({id: g.id, name: g.label, emojis: [...g.emojis]}));
+      }
+      return d;
+    }
   } catch (e2) {}
-  return { children:[], activities:[...DEFAULT_ACTIVITIES], activityCategories:[...DEFAULT_ACTIVITY_CATEGORIES], rewards:[...DEFAULT_REWARDS], familyTarget: null, templates: [] };
+  const defaultEmojiLibrary = (typeof EMOJI_GROUPS !== "undefined")
+    ? EMOJI_GROUPS.map(g => ({id: g.id, name: g.label, emojis: [...g.emojis]}))
+    : [];
+  return { children:[], activities:[...DEFAULT_ACTIVITIES], activityCategories:[...DEFAULT_ACTIVITY_CATEGORIES], rewards:[...DEFAULT_REWARDS], familyTarget: null, templates: [], emojiLibrary: defaultEmojiLibrary };
 };
 const saveData = d => localStorage.setItem(LS_KEY, JSON.stringify(d));
 
@@ -3796,29 +3805,85 @@ function AddColorPicker({value, onChange}) {
 }
 
 /* Collapsed emoji picker for add-child form */
-function AddEmojiPicker({value, onChange}) {
-  const [open, setOpen] = React.useState(false);
-  return React.createElement('div', {style:{border:".5px solid rgba(0,0,0,0.1)", borderRadius:12, overflow:"hidden"}}
+/* ── CollapsibleEmojiPicker — used everywhere emojis are chosen in admin ── */
+const EMOJI_GROUPS = [
+  { id:"morning",  label:"☀️ Morgon & kväll",    emojis:["☀️","🌅","🌄","⏰","🌙","🌛","💤","😴","🛌","🌟","⭐","💫","🕯️","🌠"] },
+  { id:"home",     label:"🏠 Hemma & vardagsliv", emojis:["🏠","🏡","🛋️","🪟","🚪","🪞","🛁","🚿","🛏️","🪑","💡","🔑","🧴","🧻","🪤","📦","🗑️"] },
+  { id:"clean",    label:"🧹 Städ & ordning",     emojis:["🧹","🧺","🧼","🫧","🧽","🪣","🧻","🪠","🧴","🗑️","♻️","🫙","📦","🔧","🪛"] },
+  { id:"food",     label:"🍎 Mat & kök",          emojis:["🍽️","🥣","🍳","🧑‍🍳","🥗","🍱","🥤","☕","🧃","🍎","🍞","🧀","🥦","🥕","🍌","🍓","🫐","🥑","🍕","🥪","🫕","🥘","🍜","🥛","🍫"] },
+  { id:"outdoor",  label:"🌳 Utomhus & natur",    emojis:["🌳","🌻","🌿","🌱","🪴","🌈","⛅","🌤️","🏕️","🏖️","🏔️","⛰️","🌾","🍂","🌸","🌺","🌊","🏡","🌙","☀️","⛄","🌧️"] },
+  { id:"sport",    label:"🏃 Rörelse & sport",    emojis:["🏃","🚲","🤸","🏋️","🧘","🛝","🥾","🏊","⚽","🏀","🎾","🏓","🛴","🚶","🤾","⛸️","🎿","🏄","🧗","🤺","🥊","🎯"] },
+  { id:"school",   label:"📚 Lärande & skola",    emojis:["📚","📖","✏️","📝","🔬","🔭","🧩","🎨","🖍️","📐","📏","🗺️","🖊️","📓","🎒","🏫","🧮","🔢","🎭","🎸","🎹","🎵","🎶"] },
+  { id:"face",     label:"😊 Känslor & personer", emojis:["😊","😄","🥳","😎","🤩","💪","🙌","👏","🤝","🫂","❤️","🧡","💛","💚","💙","💜","🌟","🏆","🎉","🎊","✨","🥇"] },
+  { id:"animals",  label:"🐾 Djur & natur",       emojis:["🐶","🐱","🐾","🦋","🐝","🦜","🐢","🐠","🦊","🐻","🦁","🐸","🐼","🦒","🦓","🐨","🐯","🐙","🦅","🦚","🦔","🐿️"] },
+  { id:"tools",    label:"🔧 Verktyg & teknik",   emojis:["🔧","🪛","🔨","🪚","⚙️","🔑","🪜","🧲","💻","📱","⌨️","🖥️","📷","🎮","🕹️","🔋","💡","🔦","📡","🛠️"] },
+  { id:"symbols",  label:"⭐ Symboler & övrigt",  emojis:["⭐","🌟","💫","✨","🎯","🏆","🥇","🎁","🎀","🎊","🎉","❤️","💯","✅","⚡","🔥","💎","🌈","🍀","🎲","🪄","🎪"] },
+];
+
+function CollapsibleEmojiPicker({value, onChange, emojiLibrary}) {
+  const [isOpen,    setIsOpen]    = React.useState(false);
+  const [openGroup, setOpenGroup] = React.useState(null);
+  const myGroups = (emojiLibrary||[]).filter(cat=>(cat.emojis||[]).length>0);
+  const allGroups = myGroups.length > 0
+    ? [{id:"__mine__", label:"⭐ Mitt bibliotek", emojis: myGroups.flatMap(c=>c.emojis), isLibrary:true}, ...EMOJI_GROUPS]
+    : EMOJI_GROUPS;
+
+  const btnStyle = (e) => ({
+    fontSize:24, width:44, height:44, borderRadius:10, cursor:"pointer",
+    border: e===value ? "2.5px solid #6c5cc8" : "1.5px solid transparent",
+    background: e===value ? "#edeafb" : "#f8f7f5",
+    display:"flex", alignItems:"center", justifyContent:"center",
+    WebkitTouchCallout:"none", userSelect:"none"
+  });
+
+  return React.createElement('div', {style:{border:".5px solid rgba(0,0,0,0.1)", borderRadius:14, overflow:"hidden"}}
+    /* Header — toggles picker open/closed */
     , React.createElement('div', {
-        onClick: () => setOpen(v=>!v),
+        onClick: () => setIsOpen(v => !v),
         style:{display:"flex", alignItems:"center", justifyContent:"space-between",
           padding:"10px 14px", background:"#f8f7f5", cursor:"pointer"}}
       , React.createElement('div', {style:{display:"flex", alignItems:"center", gap:10}}
-        , React.createElement('span', {style:{fontSize:26}}, value)
+        , React.createElement('span', {style:{fontSize:26, lineHeight:1}}, value||"😊")
         , React.createElement('span', {style:{fontSize:12, color:"#3c3c43", fontWeight:600}}, "Välj emoji")
       )
-      , React.createElement('span', {style:{fontSize:13, color:"#8e8e93", display:"inline-block",
-          transform: open?"rotate(180deg)":"rotate(0deg)", transition:"transform 0.2s"}}, "▾")
+      , React.createElement('span', {style:{fontSize:13, color:"#8e8e93", transition:"transform 0.2s",
+          display:"inline-block", transform: isOpen?"rotate(180deg)":"rotate(0deg)"}}, "▾")
     )
-    , open && React.createElement('div', {style:{display:"grid", gridTemplateColumns:"repeat(8,1fr)", gap:2, padding:8, background:"white"}}
-      , EMOJIS.map(e=>
-          React.createElement('button', {key:e, onClick:()=>{ onChange(e); setOpen(false); },
-            style:{fontSize:22, background:e===value?"#edeafb":"transparent",
-              border:e===value?"2px solid #6c5cc8":"2px solid transparent",
-              borderRadius:8, padding:"5px 0", cursor:"pointer", lineHeight:1, textAlign:"center"}}, e)
+
+    /* Groups — visible when picker is open */
+    , isOpen && React.createElement('div', {style:{background:"white", maxHeight:400, overflowY:"auto"}}
+      , allGroups.map(group =>
+          React.createElement('div', {key:group.id}
+            /* Group header — toggles only this group, never closes picker */
+            , React.createElement('div', {
+                onClick: () => setOpenGroup(prev => prev===group.id ? null : group.id),
+                style:{display:"flex", alignItems:"center", justifyContent:"space-between",
+                  padding:"10px 14px", cursor:"pointer",
+                  background: openGroup===group.id ? "#f0eeff" : "white",
+                  borderTop:".5px solid rgba(0,0,0,0.06)"}}
+              , React.createElement('span', {style:{fontSize:13, fontWeight:700,
+                  color: group.isLibrary ? "#6c5cc8" : "#1c1c1e"}}, group.label)
+              , React.createElement('span', {style:{fontSize:12, color:"#8e8e93",
+                  transform: openGroup===group.id?"rotate(180deg)":"rotate(0deg)",
+                  display:"inline-block", transition:"transform 0.2s"}}, "▾")
+            )
+            /* Emoji grid */
+            , openGroup===group.id && React.createElement('div', {style:{
+                display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(44px,1fr))",
+                gap:4, padding:"8px 10px 12px", background:"#fafafa"}}
+              , group.emojis.map(e =>
+                  React.createElement('button', {key:e, onClick:()=>{ onChange(e); setIsOpen(false); setOpenGroup(null); },
+                    style:btnStyle(e)}, e)
+                )
+            )
+          )
         )
     )
   );
+}
+
+function AddEmojiPicker({value, onChange, emojiLibrary}) {
+  return React.createElement(CollapsibleEmojiPicker, {value, onChange, emojiLibrary});
 }
 
 /* Collapsed theme picker for add-child form */
@@ -5860,7 +5925,11 @@ function TemplatesAdmin({data, setData, showToast, getCats}) {
     setDeleteId(null);
   };
 
-  const EMOJIS = ["⚡","☀️","🌙","🧹","📚","🏃","🦷","🛏️","🎒","🥣","🍽️","🛁","🎮","🌟","💪"];
+  const EMOJIS = [
+    "⚡","☀️","🌙","🧹","📚","🏃","🦷","🛏️","🎒","🥣","🍽️","🛁","🎮","🌟","💪",
+    "🌅","🌛","⭐","🏆","❤️","🤸","🚲","🥾","🌿","🎨","🎵","🏠","🌳","🧘","🎉",
+    "🫧","🧺","🍳","🥗","🌈","🏕️","📖","✏️","🐾","🎯"
+  ];
   const MODES = [["checklist","✅ Checklista"],["points","⭐ Poäng"],["tid","⏱ Tid"]];
 
   /* ── FORM VIEW ── */
@@ -5886,13 +5955,11 @@ function TemplatesAdmin({data, setData, showToast, getCats}) {
             padding:"10px 14px", fontSize:15, marginBottom:12, boxSizing:"border-box"}})
       , React.createElement("label", {style:{display:"block", fontWeight:700, color:"#8e8e93",
           fontSize:11, marginBottom:6, letterSpacing:".06em", textTransform:"uppercase"}}, "Ikon")
-      , React.createElement("div", {style:{display:"flex", gap:6, flexWrap:"wrap"}}
-        , EMOJIS.map(e => React.createElement("button", {key:e, onClick:()=>setTEmoji(e),
-            style:{fontSize:22, width:40, height:40, borderRadius:10, border:"2px solid",
-              cursor:"pointer",
-              borderColor: tEmoji===e ? "#6c5cc8" : "transparent",
-              background: tEmoji===e ? "#edeafb" : "#f8f7f5"}}, e))
-      )
+      , React.createElement(CollapsibleEmojiPicker, {
+          value: tEmoji,
+          onChange: setTEmoji,
+          emojiLibrary: data.emojiLibrary||[]
+        })
     )
 
     /* Bonus */
@@ -6110,6 +6177,221 @@ function TemplatesAdmin({data, setData, showToast, getCats}) {
   );
 }
 
+/* ═══════════════ EMOJI LIBRARY ADMIN ══════════════════════════════════════ */
+function EmojiLibraryAdmin({data, setData, showToast}) {
+  const library = data.emojiLibrary || [];
+  const [view,        setView]        = React.useState("list"); // "list" | "edit-cat"
+  const [editCat,     setEditCat]     = React.useState(null);   // {id, name, emojis:[]}
+  const [newCatName,  setNewCatName]  = React.useState("");
+  const [newEmoji,    setNewEmoji]    = React.useState("");
+  const [deleteId,    setDeleteId]    = React.useState(null);
+
+  const saveLibrary = (updated) => setData(d => ({...d, emojiLibrary: updated}));
+
+  const addCategory = () => {
+    if (!newCatName.trim()) return;
+    const cat = {id:"ec"+Date.now(), name:newCatName.trim(), emojis:[]};
+    saveLibrary([...library, cat]);
+    setNewCatName("");
+    showToast("✅ Kategori skapad!");
+  };
+
+  const deleteCategory = (id) => {
+    saveLibrary(library.filter(c => c.id !== id));
+    setDeleteId(null);
+    showToast("🗑 Kategori borttagen");
+  };
+
+  const openEdit = (cat) => { setEditCat({...cat, emojis:[...cat.emojis]}); setView("edit-cat"); setNewEmoji(""); };
+
+  const saveCat = () => {
+    saveLibrary(library.map(c => c.id === editCat.id ? editCat : c));
+    setView("list"); setEditCat(null);
+    showToast("✅ Sparat!");
+  };
+
+  const addEmojiToCat = () => {
+    const trimmed = newEmoji.trim();
+    if (!trimmed) return;
+    // Split in case user pastes multiple emoji
+    const arr = [...new Intl.Segmenter().segment(trimmed)].map(s=>s.segment).filter(s=>s.trim());
+    const unique = arr.filter(e => !editCat.emojis.includes(e));
+    if (!unique.length) { showToast("Emoji finns redan!"); return; }
+    setEditCat(c => ({...c, emojis:[...c.emojis, ...unique]}));
+    setNewEmoji("");
+  };
+
+  const removeEmojiFromCat = (emoji) => {
+    setEditCat(c => ({...c, emojis: c.emojis.filter(e => e !== emoji)}));
+  };
+
+  const moveEmojiToOtherCat = (emoji, targetCatId) => {
+    const updated = library.map(c => {
+      if (c.id === editCat.id) return {...c, emojis: c.emojis.filter(e => e !== emoji)};
+      if (c.id === targetCatId) return {...c, emojis: [...c.emojis, emoji]};
+      return c;
+    });
+    saveLibrary(updated);
+    setEditCat(updated.find(c => c.id === editCat.id));
+  };
+
+  /* ── Edit category view ── */
+  if (view === "edit-cat" && editCat) return React.createElement("div", {className:"fade-up"}
+    , React.createElement("div", {style:{display:"flex", alignItems:"center", gap:10, marginBottom:16}}
+      , React.createElement("button", {onClick:()=>{ setView("list"); setEditCat(null); },
+          style:{background:"#f2f2f7", border:"none", borderRadius:50, width:34, height:34,
+            cursor:"pointer", fontSize:16, display:"flex", alignItems:"center", justifyContent:"center"}}, "←")
+      , React.createElement("div", {style:{fontSize:15, fontWeight:800, color:"#1c1c1e"}}, editCat.name)
+    )
+
+    /* Add emoji input */
+    , React.createElement("div", {style:{background:"white", borderRadius:14, padding:"14px 16px",
+        border:".5px solid rgba(0,0,0,0.08)", marginBottom:12}}
+      , React.createElement("div", {style:{fontSize:11, fontWeight:700, color:"#8e8e93",
+          letterSpacing:".06em", textTransform:"uppercase", marginBottom:8}}, "Lägg till emoji")
+      , React.createElement("div", {style:{display:"flex", gap:8}}
+        , React.createElement("input", {
+            value: newEmoji,
+            onChange: e => setNewEmoji(e.target.value),
+            onKeyDown: e => e.key==="Enter" && addEmojiToCat(),
+            placeholder: "Klistra in emoji här… 🌟⚡🎨",
+            style:{flex:1, border:".5px solid rgba(0,0,0,0.1)", borderRadius:12,
+              padding:"10px 14px", fontSize:20, boxSizing:"border-box"}})
+        , React.createElement("button", {onClick: addEmojiToCat,
+            style:{background:"#6c5cc8", border:"none", borderRadius:12, padding:"10px 16px",
+              color:"white", fontWeight:800, fontSize:14, cursor:"pointer", flexShrink:0}},
+            "+ Lägg till")
+      )
+      , React.createElement("div", {style:{fontSize:11, color:"#8e8e93", marginTop:6}},
+          "Tips: du kan klistra in flera emoji på en gång")
+    )
+
+    /* Emoji grid */
+    , editCat.emojis.length > 0 && React.createElement("div", {style:{background:"white", borderRadius:14,
+        padding:"14px 16px", border:".5px solid rgba(0,0,0,0.08)", marginBottom:12}}
+      , React.createElement("div", {style:{fontSize:11, fontWeight:700, color:"#8e8e93",
+          letterSpacing:".06em", textTransform:"uppercase", marginBottom:10}},
+          editCat.emojis.length + " emoji")
+      , React.createElement("div", {style:{display:"flex", flexWrap:"wrap", gap:8}}
+        , editCat.emojis.map(e =>
+            React.createElement("div", {key:e,
+              style:{position:"relative", display:"inline-flex"}}
+              , React.createElement("div", {
+                  style:{fontSize:28, width:48, height:48, borderRadius:12,
+                    background:"#f8f7f5", border:".5px solid rgba(0,0,0,0.08)",
+                    display:"flex", alignItems:"center", justifyContent:"center",
+                    cursor:"default", WebkitTouchCallout:"none", userSelect:"none"}},
+                  e)
+              , React.createElement("button", {
+                  onClick: () => removeEmojiFromCat(e),
+                  style:{position:"absolute", top:-6, right:-6, width:18, height:18,
+                    borderRadius:"50%", background:"#b91c1c", border:"none",
+                    color:"white", fontSize:10, cursor:"pointer",
+                    display:"flex", alignItems:"center", justifyContent:"center",
+                    lineHeight:1, fontWeight:800}}, "✕")
+            )
+          )
+      )
+
+      /* Move to other category */
+      , library.filter(c => c.id !== editCat.id).length > 0 && React.createElement("div", {style:{marginTop:12}}
+        , React.createElement("div", {style:{fontSize:11, color:"#8e8e93", fontWeight:600, marginBottom:6}},
+            "Flytta emoji till annan kategori: tryck på emoji och välj målkategori")
+      )
+    )
+
+    , editCat.emojis.length === 0 && React.createElement("div", {style:{
+        background:"white", borderRadius:14, padding:"24px 16px",
+        border:".5px solid rgba(0,0,0,0.08)", textAlign:"center",
+        color:"#8e8e93", fontSize:13, marginBottom:12}},
+        "Inga emoji än — klistra in ovan")
+
+    /* Save */
+    , React.createElement("div", {style:{display:"flex", gap:10}}
+      , React.createElement("button", {onClick: saveCat,
+          style:{flex:1, background:"#6c5cc8", border:"none", borderRadius:12,
+            padding:"13px", color:"white", fontWeight:800, fontSize:15, cursor:"pointer"}},
+          "💾 Spara kategori")
+      , React.createElement("button", {onClick:()=>{ setView("list"); setEditCat(null); },
+          style:{padding:"13px 18px", background:"#f2f2f7", border:"none",
+            borderRadius:12, cursor:"pointer", fontWeight:700, fontSize:14}}, "Avbryt")
+    )
+  );
+
+  /* ── List view ── */
+  return React.createElement("div", {className:"fade-up"}
+
+    , React.createElement("div", {style:{fontSize:15, fontWeight:800, color:"#1c1c1e", marginBottom:16}},
+        "Mitt emoji-bibliotek")
+
+    /* Add new category */
+    , React.createElement("div", {style:{background:"white", borderRadius:14, padding:"14px 16px",
+        border:".5px solid rgba(0,0,0,0.08)", marginBottom:12}}
+      , React.createElement("div", {style:{fontSize:11, fontWeight:700, color:"#8e8e93",
+          letterSpacing:".06em", textTransform:"uppercase", marginBottom:8}}, "Ny kategori")
+      , React.createElement("div", {style:{display:"flex", gap:8}}
+        , React.createElement("input", {
+            value: newCatName,
+            onChange: e => setNewCatName(e.target.value),
+            onKeyDown: e => e.key==="Enter" && addCategory(),
+            placeholder: "T.ex. Morgon, Städ, Mat…",
+            style:{flex:1, border:".5px solid rgba(0,0,0,0.1)", borderRadius:12,
+              padding:"10px 14px", fontSize:15, boxSizing:"border-box"}})
+        , React.createElement("button", {onClick: addCategory,
+            style:{background:"#6c5cc8", border:"none", borderRadius:12, padding:"10px 16px",
+              color:"white", fontWeight:800, fontSize:14, cursor:"pointer", flexShrink:0}},
+            "+ Skapa")
+      )
+    )
+
+    /* Category list */
+    , library.length === 0 && React.createElement("div", {style:{
+        background:"white", borderRadius:14, padding:"32px 16px",
+        border:".5px solid rgba(0,0,0,0.08)", textAlign:"center",
+        color:"#8e8e93", fontSize:14}},
+        "Inga kategorier än — skapa din första ovan")
+
+    , library.map(cat =>
+        React.createElement("div", {key:cat.id,
+          style:{background:"white", borderRadius:14, padding:"12px 14px",
+            marginBottom:8, border:".5px solid rgba(0,0,0,0.08)"}}
+          , deleteId === cat.id
+            ? React.createElement(DeleteConfirm, {label:cat.name,
+                onConfirm:()=>deleteCategory(cat.id),
+                onCancel:()=>setDeleteId(null)})
+            : React.createElement("div", null
+                , React.createElement("div", {style:{display:"flex", alignItems:"center", gap:12}}
+                  , React.createElement("div", {style:{flex:1}}
+                    , React.createElement("div", {style:{fontSize:14, fontWeight:800, color:"#1c1c1e"}},
+                        cat.name)
+                    , React.createElement("div", {style:{fontSize:11, color:"#8e8e93", marginTop:2}},
+                        cat.emojis.length + " emoji")
+                  )
+                  , React.createElement("button", {onClick:()=>openEdit(cat),
+                      style:{background:"rgba(59,130,246,0.08)", border:"none", borderRadius:9,
+                        padding:"7px 12px", cursor:"pointer", fontWeight:700,
+                        color:"#3b82f6", fontSize:13}}, "✏️ Redigera")
+                  , React.createElement("button", {onClick:()=>setDeleteId(cat.id),
+                      style:{background:"#fee2e2", border:"none", borderRadius:9,
+                        padding:"7px 12px", cursor:"pointer", fontWeight:700,
+                        color:"#c0392b", fontSize:13}}, "🗑")
+                )
+                /* Preview row */
+                , cat.emojis.length > 0 && React.createElement("div", {style:{
+                    display:"flex", flexWrap:"wrap", gap:4, marginTop:8}}
+                  , cat.emojis.slice(0,16).map(e =>
+                      React.createElement("span", {key:e,
+                        style:{fontSize:22, lineHeight:1}}, e))
+                  , cat.emojis.length > 16 && React.createElement("span", {
+                      style:{fontSize:11, color:"#8e8e93", alignSelf:"center"}},
+                      "+"+( cat.emojis.length-16)+" till")
+                )
+            )
+        )
+      )
+  );
+}
+
 function SettingsView({data, setData, showToast, timerStates, setTimerStates, onLock}) {
   const [tab, setTab] = useState("children");
   const fileRef = useRef(null);
@@ -6180,8 +6462,46 @@ function SettingsView({data, setData, showToast, timerStates, setTimerStates, on
   const ACTIVITY_COLORS = ["#0d9488","#f97316","#8b5cf6","#ef4444","#3b82f6","#10b981","#f59e0b","#ec4899"];
   const DIFF_LABELS = ["","Lätt","Medel","Svår"];
   const DIFF_COLORS = ["","#22c55e","#f59e0b","#ef4444"];
-  const CAT_ICONS   = ["🏠","🌳","🏫","⚽","🎨","🎵","🐾","🌊","🏋️","🚗"];
-  const ACT_ICONS   = ["🦷","🛏️","🥣","🍱","🍽️","🥄","🧹","🧸","🛋️","🌻","🛝","🤸","🚲","🥾","🪴","📚","🎨","🎵","🏃","⭐","🧩","🐶","🌈","🪁"];
+  const CAT_ICONS   = [
+  // Hem & vardagsliv
+  "🏠","🏡","🛋️","🪟","🚿","🛁","🛏️","🪑","🚪","🪞",
+  // Städ & ordning
+  "🧹","🧺","🧻","🧼","🪣","🫧","🧽","🪠","🗑️","📦",
+  // Utomhus & natur
+  "🌳","🌻","🌿","🌱","🌈","⛅","🌤️","🏕️","🏔️","🌊",
+  // Mat & kök
+  "🍽️","🥣","🍳","🧑‍🍳","🥗","🍎","🥤","☕","🧃","🫙",
+  // Morgon & kväll
+  "☀️","🌙","⭐","🌅","🛌","😴","🪥","🧖","💤","🌛",
+  // Rörelse & aktivitet
+  "⚽","🏃","🚲","🤸","🏋️","🧘","🛝","🥾","🏊","🎒",
+  // Lärande & kreativitet
+  "📚","🎨","🎵","✏️","🔬","🧩","🎭","📖","🖍️","🎸",
+  // Övrigt
+  "🐾","🐶","🐱","🚗","🎮","💪","🌟","🏆","❤️","🤝"
+];
+  const ACT_ICONS   = [
+  // Morgonrutin
+  "🦷","🪥","🧖","🚿","👕","🧦","👟","🥣","🥛","🍳","☕","🧃","🍎","🎒","☀️","🌅","⏰","🛏️",
+  // Kvällsrutin
+  "🌙","😴","💤","🛌","📖","🧸","🪟","🌛","🌟","💫","🕯️","🧘",
+  // Hemma & städ
+  "🧹","🧺","🧻","🧼","🪣","🫧","🧽","🗑️","📦","🪑","🛋️","🚪","🪞","🛁","🪤","🧴","🫙","🧲",
+  // Mat & kök
+  "🍽️","🥄","🍳","🧑‍🍳","🥗","🍱","🥤","🍞","🧀","🫕","🥘","🍜","🥦","🍕","🥪",
+  // Utomhus & natur
+  "🌳","🌻","🌿","🌱","🪴","🌈","⛅","🏕️","🌊","🏖️","🏔️","⛰️","🌾","🍂","🌸",
+  // Rörelse & sport
+  "🏃","🚲","🤸","🏋️","🧘","🛝","🥾","🏊","⚽","🏀","🎾","🏓","🛴","🚶","🤾",
+  // Lärande & kreativitet
+  "📚","🎨","🎵","✏️","🔬","🧩","📖","🖍️","🎸","🎹","🎭","📝","🔭","🗺️",
+  // Socialt & välmående
+  "❤️","🤝","🫂","😊","💪","🌟","🏆","🎉","🙏","👏",
+  // Djur & natur
+  "🐶","🐱","🐾","🦋","🐝","🐛","🦜","🐢","🐠","🦊",
+  // Övrigt
+  "⭐","🎮","📱","🎁","🪁","🎯","🧪","🔑","💡","⚡"
+];
 
   const getCats = () => (data.activityCategories && data.activityCategories.length)
     ? data.activityCategories
@@ -6292,7 +6612,7 @@ function SettingsView({data, setData, showToast, timerStates, setTimerStates, on
       children:kids, activities:data.activities||[],
       activityCategories:data.activityCategories||[],
       rewards:data.rewards||[], familyTarget:data.familyTarget?{...data.familyTarget,image:null}:null,
-      templates:data.templates||[], timerStates:Object.fromEntries(Object.entries(timerStates||{}).map(([id,t])=>[id,t?{...t,running:false,phase:t.phase==="done"?"idle":t.phase==="running"?"paused":t.phase}:t])),
+      templates:data.templates||[], emojiLibrary:data.emojiLibrary||[], timerStates:Object.fromEntries(Object.entries(timerStates||{}).map(([id,t])=>[id,t?{...t,running:false,phase:t.phase==="done"?"idle":t.phase==="running"?"paused":t.phase}:t])),
       _pin:loadPin()||null
     };
   };
@@ -6310,7 +6630,7 @@ function SettingsView({data, setData, showToast, timerStates, setTimerStates, on
       children:kids, activities:data.activities||[],
       activityCategories:data.activityCategories||[],
       rewards:data.rewards||[], familyTarget:data.familyTarget||null,
-      templates:data.templates||[], timerStates:Object.fromEntries(Object.entries(timerStates||{}).map(([id,t])=>[id,t?{...t,running:false,phase:t.phase==="done"?"idle":t.phase==="running"?"paused":t.phase}:t])),
+      templates:data.templates||[], emojiLibrary:data.emojiLibrary||[], timerStates:Object.fromEntries(Object.entries(timerStates||{}).map(([id,t])=>[id,t?{...t,running:false,phase:t.phase==="done"?"idle":t.phase==="running"?"paused":t.phase}:t])),
       _pin:loadPin()||null
     };
   };
@@ -6469,6 +6789,7 @@ function SettingsView({data, setData, showToast, timerStates, setTimerStates, on
       activityCategories: data.activityCategories || [],
       rewards:     data.rewards     || [],
       templates:   data.templates   || [],
+      emojiLibrary: data.emojiLibrary || [],
       familyTarget: data.familyTarget || null,
       timerStates: Object.fromEntries(Object.entries(timerStates||{}).map(([id,t])=>[id,t?{...t,running:false,phase:t.phase==="done"?"idle":t.phase==="running"?"paused":t.phase}:t])),
       _pin:        loadPin()        || null
@@ -6537,6 +6858,8 @@ function SettingsView({data, setData, showToast, timerStates, setTimerStates, on
     if (sel.rewards)       next.rewards            = p.rewards            || data.rewards;
     if (sel.rutiner && p.templates !== undefined)
                            next.templates          = p.templates          || [];
+    if (sel.emojis && p.emojiLibrary !== undefined)
+                           next.emojiLibrary       = p.emojiLibrary       || [];
     if (sel.familjemal)    next.familyTarget       = sel.bilder
                              ? (p.familyTarget || null)
                              : (p.familyTarget ? {...p.familyTarget, image:null} : null);
@@ -6578,6 +6901,7 @@ function SettingsView({data, setData, showToast, timerStates, setTimerStates, on
             {k:"pin",         label:"PIN-kod"},
             {k:"poang",       label:"Poängbank", dep:"children"},
             {k:"rutiner",     label:"Rutiner & rutinsteg"},
+            {k:"emojis",      label:"Emoji-bibliotek"},
             {k:"timer",       label:"Timerstatus (aktiva timers)"},
           ];
           const doExport = () => {
@@ -6598,6 +6922,7 @@ function SettingsView({data, setData, showToast, timerStates, setTimerStates, on
             if (exportSel.familjemal)  snap.familyTarget       = exportSel.bilder?(data.familyTarget||null):(data.familyTarget?{...data.familyTarget,image:null}:null);
             if (exportSel.pin)     snap._pin        = loadPin()||null;
             if (exportSel.rutiner) snap.templates   = data.templates||[];
+            if (exportSel.emojis)  snap.emojiLibrary = data.emojiLibrary||[];
             if (exportSel.timer)   snap.timerStates = Object.fromEntries(
               Object.entries(timerStates||{}).map(([id,t]) => [id, t ? {...t, running:false, phase: t.phase==="done"?"idle":t.phase==="running"?"paused":t.phase} : t])
             );
@@ -6785,6 +7110,7 @@ function SettingsView({data, setData, showToast, timerStates, setTimerStates, on
             {k:"pin",         label:"PIN-kod"},
             {k:"poang",       label:"Poängbank", dep:"children"},
             {k:"rutiner",     label:"Rutiner & rutinsteg"},
+            {k:"emojis",      label:"Emoji-bibliotek"},
             {k:"timer",       label:"Timerstatus (aktiva timers)"},
           ];
           const p = pendingImport;
@@ -6801,6 +7127,7 @@ function SettingsView({data, setData, showToast, timerStates, setTimerStates, on
             if (k==="kategorier")  return !!(p.activityCategories&&p.activityCategories.length);
             if (k==="rewards")     return !!(p.rewards&&p.rewards.length);
             if (k==="rutiner")     return !!(p.templates&&p.templates.length);
+            if (k==="emojis")      return !!(p.emojiLibrary&&p.emojiLibrary.length);
             if (k==="timer")       return !!(p.timerStates&&Object.keys(p.timerStates).length);
             if (k==="pin")         return !!p._pin;
             return false;
@@ -6853,8 +7180,9 @@ function SettingsView({data, setData, showToast, timerStates, setTimerStates, on
         , React.createElement('button', { onClick: ()=>setTab("children"),   style: tStyle("children")}, "👧 Barn" )
         , React.createElement('button', { onClick: ()=>setTab("activities"), style: tStyle("activities")}, "🏃 Aktiviteter" )
         , React.createElement('button', { onClick: ()=>setTab("rewards"),    style: tStyle("rewards")}, "🎁 Belöningar" )
-        , React.createElement('button', { onClick: ()=>setTab("backup"),     style: tStyle("backup")}, "💾 Säkerhetskopiering" )
         , React.createElement('button', { onClick: ()=>setTab("templates"), style: tStyle("templates")}, "⚡ Rutiner" )
+        , React.createElement('button', { onClick: ()=>setTab("emojis"),    style: tStyle("emojis")}, "😊 Emoji" )
+        , React.createElement('button', { onClick: ()=>setTab("backup"),     style: tStyle("backup")}, "💾 Säkerhetskopiering" )
       )
 
       /* ── CHILDREN ── */
@@ -6955,7 +7283,7 @@ function SettingsView({data, setData, showToast, timerStates, setTimerStates, on
               /* Emoji — collapsed */
               , React.createElement('label', {style:{display:"block", fontWeight:700,
                   color:"#8e8e93", fontSize:11, marginBottom:6, letterSpacing:".06em", textTransform:"uppercase"}}, "Emoji")
-              , React.createElement(AddEmojiPicker, {value:addEmoji, onChange:setAddEmoji})
+              , React.createElement(AddEmojiPicker, {value:addEmoji, onChange:setAddEmoji, emojiLibrary:data.emojiLibrary||[]})
 
               /* Tema & färg — same BG_COLORS as edit modal */
               , React.createElement('label', {style:{display:"block", fontWeight:700,
@@ -7094,9 +7422,11 @@ function SettingsView({data, setData, showToast, timerStates, setTimerStates, on
               /* Ikon */
               React.createElement('div', {key:"icon", style:{marginBottom:10}}
                 , React.createElement('div', {style:{fontWeight:700,color:"#8e8e93",fontSize:11,marginBottom:6,letterSpacing:".06em",textTransform:"uppercase"}}, "Ikon")
-                , React.createElement('div', {style:{display:"flex",flexWrap:"wrap",gap:6}}
-                  , ACT_ICONS.map(ic=> React.createElement('button', {key:ic,onClick:()=>setEditActInCat(a=>({...a,icon:ic})),style:{fontSize:18,width:36,height:36,borderRadius:8,cursor:"pointer",border:editActInCat.icon===ic?"2.5px solid "+(liveCat.color||"#8b5cf6"):"2px solid #e2e8f0",background:editActInCat.icon===ic?"#f5f3ff":"#f8fafc"}}, ic))
-                )
+                , React.createElement(CollapsibleEmojiPicker, {
+                    value: editActInCat.icon,
+                    onChange: ic => setEditActInCat(a=>({...a,icon:ic})),
+                    emojiLibrary: data.emojiLibrary||[]
+                  })
               ),
               /* Namn */
               React.createElement('input', {key:"name", value:editActInCat.label,onChange:e=>setEditActInCat(a=>({...a,label:e.target.value})),placeholder:"Aktivitetsnamn",style:{width:"100%",border:".5px solid rgba(0,0,0,0.1)",borderRadius:9,padding:"9px 12px",fontSize:14,marginBottom:10,boxSizing:"border-box"}}),
@@ -7199,12 +7529,10 @@ function SettingsView({data, setData, showToast, timerStates, setTimerStates, on
           , React.createElement('div', { style: {background:"white", borderRadius:16, padding:"14px 16px",
               marginBottom:12, border:".5px solid rgba(0,0,0,0.08)"}}
             , React.createElement('div', { style: {fontSize:15, fontWeight:800, color:"#1c1c1e", marginBottom:12}}, "Ny belöning")
+            , React.createElement('div', { style: {marginBottom:10}},
+                React.createElement(CollapsibleEmojiPicker, {value:newREmoji, onChange:setNewREmoji, emojiLibrary:data.emojiLibrary||[]}))
             , React.createElement('div', { style: {display:"flex", gap:10, alignItems:"center"}}
-              , React.createElement('button', { onClick: ()=>setShowRIconPicker(true),
-                  style: {width:46, height:46, fontSize:26, borderRadius:12,
-                    border:".5px solid rgba(0,0,0,0.1)", background:"#f2f2f7",
-                    cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0}},
-                  newREmoji)
+              , React.createElement('span', {style:{fontSize:28, flexShrink:0}}, newREmoji)
               , React.createElement('input', { value: newRLabel, onChange: e=>setNewRLabel(e.target.value),
                   onKeyDown: e=>e.key==="Enter"&&addReward(),
                   placeholder: "Namn på belöning…",
@@ -7245,12 +7573,10 @@ function SettingsView({data, setData, showToast, timerStates, setTimerStates, on
                   , _optionalChain([editRew, 'optionalAccess', _15 => _15.id])===r.id
                     /* Edit form */
                     ? React.createElement('div', null
+                        , React.createElement('div', {style:{marginBottom:10}},
+                            React.createElement(CollapsibleEmojiPicker, {value:editRew.emoji, onChange:e=>setEditRew({...editRew,emoji:e}), emojiLibrary:data.emojiLibrary||[]}))
                         , React.createElement('div', { style:{display:"flex", alignItems:"center", gap:10, marginBottom:10}}
-                          , React.createElement('button', { onClick:()=>setShowRIconPickerEdit(true),
-                              style:{width:46, height:46, fontSize:26, borderRadius:12,
-                                border:".5px solid #6c5cc8", background:"#edeafb",
-                                cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center"}},
-                              editRew.emoji)
+                          , React.createElement('span', {style:{fontSize:28, flexShrink:0}}, editRew.emoji)
                           , React.createElement('input', { value:editRew.label, onChange:e=>setEditRew({...editRew,label:e.target.value}),
                               style:{flex:1, border:".5px solid rgba(0,0,0,0.12)", borderRadius:10, padding:"9px 12px", fontSize:15}})
                         )
@@ -7426,14 +7752,6 @@ function SettingsView({data, setData, showToast, timerStates, setTimerStates, on
         )
       )
 
-      /* EMOJI PICKERS */
-      , showRIconPicker && (
-        React.createElement(EmojiPickerModal, { current: newREmoji, onSelect: e=>setNewREmoji(e), onClose: ()=>setShowRIconPicker(false)})
-      )
-      , showRIconPickerEdit && editRew && (
-        React.createElement(EmojiPickerModal, { current: editRew.emoji, onSelect: e=>setEditRew({...editRew,emoji:e}), onClose: ()=>setShowRIconPickerEdit(false)})
-      )
-
       /* EDIT CHILD MODAL */
       , editChild && (
         React.createElement(Modal, { onClose: ()=>{ setEditChild(null); setDeleteId(null); }}
@@ -7518,37 +7836,12 @@ function SettingsView({data, setData, showToast, timerStates, setTimerStates, on
 
           /* Emoji — collapsed by default */
           , React.createElement('label', { style: {display:"block", fontWeight:700, color:"#8e8e93", fontSize:11, marginBottom:6, letterSpacing:".06em", textTransform:"uppercase"}}, "Emoji")
-          , React.createElement('div', { style:{border:".5px solid rgba(0,0,0,0.1)", borderRadius:12, overflow:"hidden", marginBottom:16}}
-            /* Selected preview row — click to toggle */
-            , React.createElement('div', {
-                onClick: () => setEditShowEmoji(v => !v),
-                style:{
-                  display:"flex", alignItems:"center", justifyContent:"space-between",
-                  padding:"10px 14px", background:"#f8f7f5", cursor:"pointer"}}
-              , React.createElement('div', {style:{display:"flex", alignItems:"center", gap:10}}
-                , React.createElement('span', {style:{fontSize:26}}, editEmoji)
-                , React.createElement('span', {style:{fontSize:12, color:"#3c3c43", fontWeight:600}}, "Ändra emoji")
-              )
-              , React.createElement('span', {style:{
-                  fontSize:13, color:"#8e8e93",
-                  display:"inline-block",
-                  transform: editShowEmoji ? "rotate(180deg)" : "rotate(0deg)",
-                  transition:"transform 0.2s"}}, "▾")
-            )
-            /* Grid — only shown when open */
-            , editShowEmoji && React.createElement('div', { style:{
-                display:"grid", gridTemplateColumns:"repeat(8, 1fr)",
-                gap:2, padding:8, background:"white"}}
-              , EMOJIS.map(e =>
-                  React.createElement('button', { key: e, onClick: ()=>{ setEditEmoji(e); setEditShowEmoji(false); },
-                    style:{
-                      fontSize:24, background: e===editEmoji ? "#edeafb" : "transparent",
-                      border: e===editEmoji ? "2px solid #6c5cc8" : "2px solid transparent",
-                      borderRadius:8, padding:"8px 0", cursor:"pointer",
-                      lineHeight:1, textAlign:"center"}},
-                    e)
-                )
-            )
+          , React.createElement('div', {style:{marginBottom:16}}
+            , React.createElement(CollapsibleEmojiPicker, {
+                value: editEmoji,
+                onChange: e => setEditEmoji(e),
+                emojiLibrary: data.emojiLibrary||[]
+              })
           )
 
           /* Kortfärg — collapsed by default */
@@ -7612,6 +7905,10 @@ function SettingsView({data, setData, showToast, timerStates, setTimerStates, on
       /* ── TEMPLATES ── */
       , tab==="templates" && React.createElement(TemplatesAdmin, {
           data: data, setData: setData, showToast: showToast, getCats: getCats
+        })
+
+      , tab==="emojis" && React.createElement(EmojiLibraryAdmin, {
+          data: data, setData: setData, showToast: showToast
         })
 
     )
