@@ -106,12 +106,24 @@
 <div id="root"></div>
 <script type="text/javascript">
 const _jsxFileName = "";
-console.log("v1772630574 GoalCelebration:", typeof GoalCelebration !== "undefined" ? "OK" : "MISSING");
 function _optionalChain(ops) { let lastAccessLHS = undefined; let value = ops[0]; let i = 1; while (i < ops.length) { const op = ops[i]; const fn = ops[i + 1]; i += 2; if ((op === 'optionalAccess' || op === 'optionalCall') && value == null) { return undefined; } if (op === 'access' || op === 'optionalAccess') { lastAccessLHS = value; value = fn(value); } else if (op === 'call' || op === 'optionalCall') { value = fn((...args) => value.call(lastAccessLHS, ...args)); lastAccessLHS = undefined; } } return value; }
 const { useState, useEffect, useRef } = React;
 
 /* ─── CONSTANTS ─────────────────────────────────────────────────────────── */
 const EMOJIS    = ["🦁","🐸","🦊","🐼","🦋","🐬","🦄","🐉","🐨","🐯","🐻","🦖","🐧","🦒","🦓","🐙","🦅","🦚","🦜","🐺","🦝","🐻‍❄️","🦁","🐮","🐷","🦔","🐿️","🦡","🦦","🐝","🦋","🌟","⭐","🌈","❤️","🎉","🏆","💫","🎨"];
+const EMOJI_GROUPS = [
+  { id:"morning",  label:"☀️ Morgon & kväll",    emojis:["☀️","🌅","🌄","⏰","🌙","🌛","💤","😴","🛌","🌟","⭐","💫","🕯️","🌠"] },
+  { id:"home",     label:"🏠 Hemma & vardagsliv", emojis:["🏠","🏡","🛋️","🪟","🚪","🪞","🛁","🚿","🛏️","🪑","💡","🔑","🧴","🧻","🪤","📦","🗑️"] },
+  { id:"clean",    label:"🧹 Städ & ordning",     emojis:["🧹","🧺","🧼","🫧","🧽","🪣","🧻","🪠","🧴","🗑️","♻️","🫙","📦","🔧","🪛"] },
+  { id:"food",     label:"🍎 Mat & kök",          emojis:["🍽️","🥣","🍳","🧑‍🍳","🥗","🍱","🥤","☕","🧃","🍎","🍞","🧀","🥦","🥕","🍌","🍓","🫐","🥑","🍕","🥪","🫕","🥘","🍜","🥛","🍫"] },
+  { id:"outdoor",  label:"🌳 Utomhus & natur",    emojis:["🌳","🌻","🌿","🌱","🪴","🌈","⛅","🌤️","🏕️","🏖️","🏔️","⛰️","🌾","🍂","🌸","🌺","🌊","🏡","🌙","☀️","⛄","🌧️"] },
+  { id:"sport",    label:"🏃 Rörelse & sport",    emojis:["🏃","🚲","🤸","🏋️","🧘","🛝","🥾","🏊","⚽","🏀","🎾","🏓","🛴","🚶","🤾","⛸️","🎿","🏄","🧗","🤺","🥊","🎯"] },
+  { id:"school",   label:"📚 Lärande & skola",    emojis:["📚","📖","✏️","📝","🔬","🔭","🧩","🎨","🖍️","📐","📏","🗺️","🖊️","📓","🎒","🏫","🧮","🔢","🎭","🎸","🎹","🎵","🎶"] },
+  { id:"face",     label:"😊 Känslor & personer", emojis:["😊","😄","🥳","😎","🤩","💪","🙌","👏","🤝","🫂","❤️","🧡","💛","💚","💙","💜","🌟","🏆","🎉","🎊","✨","🥇"] },
+  { id:"animals",  label:"🐾 Djur & natur",       emojis:["🐶","🐱","🐾","🦋","🐝","🦜","🐢","🐠","🦊","🐻","🦁","🐸","🐼","🦒","🦓","🐨","🐯","🐙","🦅","🦚","🦔","🐿️"] },
+  { id:"tools",    label:"🔧 Verktyg & teknik",   emojis:["🔧","🪛","🔨","🪚","⚙️","🔑","🪜","🧲","💻","📱","⌨️","🖥️","📷","🎮","🕹️","🔋","💡","🔦","📡","🛠️"] },
+  { id:"symbols",  label:"⭐ Symboler & övrigt",  emojis:["⭐","🌟","💫","✨","🎯","🏆","🥇","🎁","🎀","🎊","🎉","❤️","💯","✅","⚡","🔥","💎","🌈","🍀","🎲","🪄","🎪"] },
+];
 const BG_COLORS = [
   // Röd-Orange-Guld
   "#ac1917","#b75420","#c0982b",
@@ -286,7 +298,44 @@ const loadData = () => {
     : [];
   return { children:[], activities:[...DEFAULT_ACTIVITIES], activityCategories:[...DEFAULT_ACTIVITY_CATEGORIES], rewards:[...DEFAULT_REWARDS], familyTarget: null, templates: [], emojiLibrary: defaultEmojiLibrary };
 };
-const saveData = d => localStorage.setItem(LS_KEY, JSON.stringify(d));
+const saveData = d => {
+  try {
+    localStorage.setItem(LS_KEY, JSON.stringify(d));
+  } catch(e) {
+    // QuotaExceededError — try saving without images as fallback
+    try {
+      const stripped = {...d,
+        children: (d.children||[]).map(c => ({...c,
+          avatar: null,
+          targets: (c.targets||[]).map(t => ({...t, image:null}))
+        })),
+        familyTarget: d.familyTarget ? {...d.familyTarget, image:null} : null
+      };
+      localStorage.setItem(LS_KEY, JSON.stringify(stripped));
+      console.warn("Belöningsbanken: bilder ej sparade (localStorage full)");
+    } catch(e2) {
+      console.error("Belöningsbanken: kunde inte spara data", e2);
+    }
+  }
+};
+
+/* Compress image to max 300px JPEG at 65% quality — reduces ~2MB → ~20KB */
+const compressImage = (dataUrl, callback) => {
+  const img = new Image();
+  img.onload = () => {
+    const MAX = 300;
+    let w = img.width, h = img.height;
+    if (w > MAX || h > MAX) {
+      if (w > h) { h = Math.round(h * MAX / w); w = MAX; }
+      else       { w = Math.round(w * MAX / h); h = MAX; }
+    }
+    const canvas = document.createElement("canvas");
+    canvas.width = w; canvas.height = h;
+    canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+    callback(canvas.toDataURL("image/jpeg", 0.65));
+  };
+  img.src = dataUrl;
+};
 
 /* ─── PIN STORAGE ────────────────────────────────────────────────────────── */
 const PIN_KEY = "belöningsbanken_pin";
@@ -1237,7 +1286,7 @@ function TargetsView({child, updateChild, showToast, isInline, familyTarget, set
   const handleImageUpload = e => {
     const file = _optionalChain([e, 'access', _2 => _2.target, 'access', _3 => _3.files, 'optionalAccess', _4 => _4[0]]); if (!file) return;
     const reader = new FileReader();
-    reader.onload = ev => setNewImage(ev.target.result);
+    reader.onload = ev => compressImage(ev.target.result, setNewImage);
     reader.readAsDataURL(file);
   };
 
@@ -1327,7 +1376,7 @@ function TargetsView({child, updateChild, showToast, isInline, familyTarget, set
     setMoveFromId(null); setMoveToId(null); setMoveAmt("");
   };
 
-  const handleEditImage = e => { const f=e.target.files&&e.target.files[0]; if(!f) return; const r=new FileReader(); r.onload=ev=>setEditImage(ev.target.result); r.readAsDataURL(f); };
+  const handleEditImage = e => { const f=e.target.files&&e.target.files[0]; if(!f) return; const r=new FileReader(); r.onload=ev=>compressImage(ev.target.result, setEditImage); r.readAsDataURL(f); };
 
     return (
     React.createElement('div', { style: isInline
@@ -1372,59 +1421,76 @@ function TargetsView({child, updateChild, showToast, isInline, familyTarget, set
         /* Add family target button */
         , !familyTarget && setFamilyTarget && (
           showFamAdd
-            ? React.createElement('div', {style:{background:"linear-gradient(135deg,#f5f3ff,#ede9fe)",
-                border:"2px solid rgba(139,92,246,0.3)",borderRadius:16,padding:"14px",marginBottom:12}}
-              , React.createElement('div', {style:{fontFamily:"'Fredoka One',cursive",fontSize:14,
-                  color:"#5b4bb0",marginBottom:10}}, "Nytt familjemål")
+            ? React.createElement('div', {style:{background:"white",
+                border:".5px solid rgba(0,0,0,0.08)",borderRadius:16,padding:"14px",marginBottom:12}}
+              , React.createElement('div', {style:{fontSize:13,fontWeight:800,
+                  color:"#1c1c1e",marginBottom:12}}, "Nytt familjemål")
+
+              /* Bild — kamera + galleri */
+              , React.createElement('div', {style:{border:".5px solid rgba(0,0,0,0.1)", borderRadius:12, overflow:"hidden", marginBottom:12}}
+                , React.createElement('div', {style:{display:"flex", alignItems:"center", gap:12, padding:"10px 12px", background:"#f8f7f5"}}
+                  , React.createElement('div', {style:{
+                      width:44, height:44, borderRadius:10, flexShrink:0,
+                      background:"#edeafb", border:".5px solid rgba(0,0,0,0.1)",
+                      overflow:"hidden", display:"flex", alignItems:"center", justifyContent:"center", fontSize:22}}
+                    , famImage
+                      ? React.createElement('img', {src:famImage, style:{width:"100%",height:"100%",objectFit:"cover"}})
+                      : "🏆"
+                  )
+                  , React.createElement('div', {style:{flex:1, display:"flex", flexDirection:"column", gap:5}}
+                    , React.createElement('label', {style:{display:"flex", alignItems:"center", gap:8, cursor:"pointer",
+                        background:"white", border:".5px solid rgba(0,0,0,0.1)",
+                        borderRadius:9, padding:"6px 10px", fontSize:12, fontWeight:700, color:"#1c1c1e"}}
+                      , React.createElement('span', null, "📷")
+                      , "Ta bild"
+                      , React.createElement('input', {type:"file", accept:"image/*", capture:"environment",
+                          style:{display:"none"},
+                          onChange: e => { const f=e.target.files&&e.target.files[0]; if(!f)return; const r=new FileReader(); r.onload=ev=>compressImage(ev.target.result, setFamImage); r.readAsDataURL(f); e.target.value=""; }})
+                    )
+                    , React.createElement('label', {style:{display:"flex", alignItems:"center", gap:8, cursor:"pointer",
+                        background:"white", border:".5px solid rgba(0,0,0,0.1)",
+                        borderRadius:9, padding:"6px 10px", fontSize:12, fontWeight:700, color:"#1c1c1e"}}
+                      , React.createElement('span', null, "🖼️")
+                      , "Välj från galleri"
+                      , React.createElement('input', {type:"file", accept:"image/*",
+                          style:{display:"none"},
+                          onChange: e => { const f=e.target.files&&e.target.files[0]; if(!f)return; const r=new FileReader(); r.onload=ev=>compressImage(ev.target.result, setFamImage); r.readAsDataURL(f); e.target.value=""; }})
+                    )
+                  )
+                  , famImage && React.createElement('button', {
+                      onClick:()=>setFamImage(null),
+                      style:{flexShrink:0, background:"#fff1f2", border:".5px solid #fecdd3",
+                        borderRadius:8, padding:"5px 8px", fontSize:11,
+                        fontWeight:700, color:"#b91c1c", cursor:"pointer"}}, "✕")
+                )
+              )
+
               , React.createElement('input', {value:famName, onChange:e=>setFamName(e.target.value),
-                  placeholder:"Namn på familjemål...",
-                  style:{width:"100%",border:"2px solid #ddd6fe",borderRadius:10,
+                  placeholder:"Namn på familjemål…",
+                  style:{width:"100%",border:".5px solid rgba(0,0,0,0.1)",borderRadius:10,
                     padding:"10px 12px",fontSize:14,marginBottom:8,boxSizing:"border-box"}})
               , React.createElement('input', {value:famCost, onChange:e=>setFamCost(e.target.value),
-                  type:"number",min:"1",placeholder:"Poängpris",
-                  style:{width:"100%",border:"2px solid #ddd6fe",borderRadius:10,
-                    padding:"10px 12px",fontSize:14,marginBottom:8,boxSizing:"border-box"}})
-              , React.createElement('div', {style:{marginBottom:10}}
-                , React.createElement('input', {type:"file",accept:"image/*",ref:famFileRef,
-                    style:{display:"none"},
-                    onChange: e => {
-                      const f = e.target.files && e.target.files[0];
-                      if (!f) return;
-                      const r = new FileReader();
-                      r.onload = ev => setFamImage(ev.target.result);
-                      r.readAsDataURL(f);
-                    }})
-                , famImage
-                  ? React.createElement('div', {style:{display:"flex",alignItems:"center",gap:8}}
-                      , React.createElement('img', {src:famImage,
-                          style:{width:48,height:48,borderRadius:10,objectFit:"cover",border:"2px solid #ddd6fe"}})
-                      , React.createElement('button', {onClick:()=>setFamImage(null),
-                          style:{fontSize:12,color:"#ef4444",background:"none",border:"none",
-                            cursor:"pointer",fontWeight:700}}, "Ta bort bild")
-                    )
-                  : React.createElement('button', {onClick:()=>famFileRef.current&&famFileRef.current.click(),
-                      style:{width:"100%",background:"rgba(139,92,246,0.08)",
-                        border:"2px dashed rgba(139,92,246,0.3)",borderRadius:10,
-                        padding:"8px",color:"#5b4bb0",fontWeight:700,fontSize:13,cursor:"pointer"}},
-                      "Ladda upp bild (valfritt)")
-              )
+                  type:"number",min:"1",placeholder:"Poängpris ⭐",
+                  style:{width:"100%",border:".5px solid rgba(0,0,0,0.1)",borderRadius:10,
+                    padding:"10px 12px",fontSize:14,marginBottom:10,boxSizing:"border-box"}})
               , React.createElement('div', {style:{display:"flex",gap:8}}
                 , React.createElement('button', {onClick:saveFamilyTarget,
-                    style:{flex:1,background:"linear-gradient(135deg,#6c5cc8,#8b7fd4)",border:"none",
+                    style:{flex:1,background:"#6c5cc8",border:"none",
                       borderRadius:10,padding:"10px",color:"white",fontWeight:800,fontSize:13,cursor:"pointer"}},
-                    "Spara")
+                    "💾 Spara familjemål")
                 , React.createElement('button', {
-                    onClick:()=>{setShowFamAdd(false);setFamName("");setFamCost("");},
-                    style:{padding:"10px 14px",background:"rgba(0,0,0,0.04)",border:"none",
+                    onClick:()=>{setShowFamAdd(false);setFamName("");setFamCost("");setFamImage(null);},
+                    style:{padding:"10px 14px",background:"#f2f2f7",border:"none",
                       borderRadius:10,cursor:"pointer",fontWeight:700,fontSize:13}}, "Avbryt")
               )
             )
             : React.createElement('button', {
                 onClick:()=>setShowFamAdd(true),
-                style:{width:"100%",background:"linear-gradient(135deg,#f5f3ff,#ede9fe)",
-                  border:"2px dashed rgba(139,92,246,0.4)",borderRadius:16,padding:"12px",
-                  color:"#5b4bb0",fontWeight:800,fontSize:13,cursor:"pointer",
+                style:{width:"100%",background:"#edeafb",
+                  border:".5px solid #d0caee",borderRadius:14,padding:"12px",
+                  color:"#6c5cc8",fontWeight:800,fontSize:13,cursor:"pointer",
                   display:"flex",alignItems:"center",justifyContent:"center",gap:8,marginBottom:12}}
+              , React.createElement('span',{style:{fontSize:16}}, "✨")
               , "Skapa familjemål"
             )
         )
@@ -1604,7 +1670,7 @@ function TargetsView({child, updateChild, showToast, isInline, familyTarget, set
             color:"#5b4bb0",fontWeight:800,fontSize:13,cursor:"pointer",
             display:"flex",alignItems:"center",justifyContent:"center",gap:8}},
             React.createElement('span',{style:{fontSize:16}}, "✨"),
-            "Lägg till personligt mål"
+            "Skapa personligt mål"
         )
       )
 
@@ -2511,15 +2577,15 @@ function ChildHistoryPanel({ child, getCats }) {
     /* Toggle button */
     , React.createElement('button', {
         onClick: () => setShowH(s => !s),
-        style:{width:"100%",background:"#f2f2f7",border:"1.5px solid #e2e8f0",
+        style:{width:"100%",background:"white",border:".5px solid rgba(0,0,0,0.08)",
           borderRadius:12,padding:"11px 16px",cursor:"pointer",
           display:"flex",alignItems:"center",justifyContent:"space-between"}}
-      , React.createElement('span', {style:{fontFamily:"'Fredoka One',cursive",
-          fontSize:15,color:"#3c3c43"}}, "📜 Aktivitetshistorik")
+      , React.createElement('span', {style:{fontSize:13, fontWeight:800, color:"#1c1c1e"}},
+          "Aktivitetshistorik")
       , React.createElement('div', {style:{display:"flex",alignItems:"center",gap:8}}
-        , React.createElement('span', {style:{fontSize:11,color:"#8e8e93",
-            background:"#e2e8f0",borderRadius:50,padding:"2px 8px",fontWeight:700}},
-            hist.length, " st"
+        , React.createElement('span', {style:{fontSize:11,color:"#6c5cc8",
+            background:"#edeafb",borderRadius:50,padding:"2px 8px",fontWeight:700}},
+            hist.length + " st"
           )
         , React.createElement('span', {style:{fontSize:13,color:"#8e8e93",
             display:"inline-block",
@@ -2532,10 +2598,10 @@ function ChildHistoryPanel({ child, getCats }) {
     , showH && React.createElement('div', {style:{marginTop:8,display:"flex",flexDirection:"column",gap:6}}
 
       /* Topp-aktiviteter */
-      , topActs.length > 0 && React.createElement('div', {style:{background:"#ffffff",
-          borderRadius:12,padding:"12px 14px",border:"1.5px solid #e2e8f0"}}
-          , React.createElement('div', {style:{fontWeight:800,color:"#8e8e93",
-              fontSize:10,letterSpacing:1,marginBottom:10}}, "TOPP-AKTIVITETER")
+      , topActs.length > 0 && React.createElement('div', {style:{background:"white",
+          borderRadius:12,padding:"12px 14px",border:".5px solid rgba(0,0,0,0.08)"}}
+          , React.createElement('div', {style:{fontWeight:700,color:"#8e8e93",
+              fontSize:11,letterSpacing:".06em",textTransform:"uppercase",marginBottom:10}}, "Topp-aktiviteter")
           , React.createElement('div', {style:{display:"flex",flexDirection:"column",gap:8}}
             , topActs.map(([label, mins]) => {
                 const act = allCatActs.find(a=>a.label===label);
@@ -2549,7 +2615,7 @@ function ChildHistoryPanel({ child, getCats }) {
                     , React.createElement('span', null, (act&&act.icon)||"⭐", " ", label)
                     , React.createElement('span', {style:{color:barColor,fontWeight:800}}, mins, " min")
                   )
-                  , React.createElement('div', {style:{height:7,background:"rgba(0,0,0,0.04)",borderRadius:99,overflow:"hidden"}}
+                  , React.createElement('div', {style:{height:6,background:"rgba(0,0,0,0.04)",borderRadius:99,overflow:"hidden"}}
                     , React.createElement('div', {style:{height:"100%",
                         width:Math.round(barPct*100)+"%",
                         background:barColor,borderRadius:99,
@@ -2572,15 +2638,14 @@ function ChildHistoryPanel({ child, getCats }) {
           return React.createElement('div', {key}
             , React.createElement('button', {
                 onClick: () => toggleM(key),
-                style:{width:"100%",background:"#ffffff",border:"1.5px solid #e2e8f0",
+                style:{width:"100%",background:"white",border:".5px solid rgba(0,0,0,0.08)",
                   borderRadius:10,padding:"9px 14px",cursor:"pointer",
                   display:"flex",alignItems:"center",justifyContent:"space-between"}}
               , React.createElement('div', {style:{display:"flex",alignItems:"center",gap:8}}
-                , React.createElement('span', {style:{fontSize:14,fontWeight:800,
-                    color:"#3c3c43",fontFamily:"'Fredoka One',cursive"}}, monthLabel)
+                , React.createElement('span', {style:{fontSize:13,fontWeight:800,color:"#1c1c1e"}}, monthLabel)
                 , React.createElement('span', {style:{fontSize:11,color:"#8e8e93",
-                    background:"#e2e8f0",borderRadius:50,padding:"2px 7px",fontWeight:700}},
-                    entries.length, " st"
+                    background:"#f2f2f7",borderRadius:50,padding:"2px 7px",fontWeight:600}},
+                    entries.length + " st"
                   )
               )
               , React.createElement('div', {style:{display:"flex",alignItems:"center",gap:8}}
@@ -3806,20 +3871,6 @@ function AddColorPicker({value, onChange}) {
 
 /* Collapsed emoji picker for add-child form */
 /* ── CollapsibleEmojiPicker — used everywhere emojis are chosen in admin ── */
-const EMOJI_GROUPS = [
-  { id:"morning",  label:"☀️ Morgon & kväll",    emojis:["☀️","🌅","🌄","⏰","🌙","🌛","💤","😴","🛌","🌟","⭐","💫","🕯️","🌠"] },
-  { id:"home",     label:"🏠 Hemma & vardagsliv", emojis:["🏠","🏡","🛋️","🪟","🚪","🪞","🛁","🚿","🛏️","🪑","💡","🔑","🧴","🧻","🪤","📦","🗑️"] },
-  { id:"clean",    label:"🧹 Städ & ordning",     emojis:["🧹","🧺","🧼","🫧","🧽","🪣","🧻","🪠","🧴","🗑️","♻️","🫙","📦","🔧","🪛"] },
-  { id:"food",     label:"🍎 Mat & kök",          emojis:["🍽️","🥣","🍳","🧑‍🍳","🥗","🍱","🥤","☕","🧃","🍎","🍞","🧀","🥦","🥕","🍌","🍓","🫐","🥑","🍕","🥪","🫕","🥘","🍜","🥛","🍫"] },
-  { id:"outdoor",  label:"🌳 Utomhus & natur",    emojis:["🌳","🌻","🌿","🌱","🪴","🌈","⛅","🌤️","🏕️","🏖️","🏔️","⛰️","🌾","🍂","🌸","🌺","🌊","🏡","🌙","☀️","⛄","🌧️"] },
-  { id:"sport",    label:"🏃 Rörelse & sport",    emojis:["🏃","🚲","🤸","🏋️","🧘","🛝","🥾","🏊","⚽","🏀","🎾","🏓","🛴","🚶","🤾","⛸️","🎿","🏄","🧗","🤺","🥊","🎯"] },
-  { id:"school",   label:"📚 Lärande & skola",    emojis:["📚","📖","✏️","📝","🔬","🔭","🧩","🎨","🖍️","📐","📏","🗺️","🖊️","📓","🎒","🏫","🧮","🔢","🎭","🎸","🎹","🎵","🎶"] },
-  { id:"face",     label:"😊 Känslor & personer", emojis:["😊","😄","🥳","😎","🤩","💪","🙌","👏","🤝","🫂","❤️","🧡","💛","💚","💙","💜","🌟","🏆","🎉","🎊","✨","🥇"] },
-  { id:"animals",  label:"🐾 Djur & natur",       emojis:["🐶","🐱","🐾","🦋","🐝","🦜","🐢","🐠","🦊","🐻","🦁","🐸","🐼","🦒","🦓","🐨","🐯","🐙","🦅","🦚","🦔","🐿️"] },
-  { id:"tools",    label:"🔧 Verktyg & teknik",   emojis:["🔧","🪛","🔨","🪚","⚙️","🔑","🪜","🧲","💻","📱","⌨️","🖥️","📷","🎮","🕹️","🔋","💡","🔦","📡","🛠️"] },
-  { id:"symbols",  label:"⭐ Symboler & övrigt",  emojis:["⭐","🌟","💫","✨","🎯","🏆","🥇","🎁","🎀","🎊","🎉","❤️","💯","✅","⚡","🔥","💎","🌈","🍀","🎲","🪄","🎪"] },
-];
-
 function CollapsibleEmojiPicker({value, onChange, emojiLibrary}) {
   const [isOpen,    setIsOpen]    = React.useState(false);
   const [openGroup, setOpenGroup] = React.useState(null);
@@ -4585,58 +4636,82 @@ function EmojiPickerModal({current, onSelect, onClose}) {
 
 /* ── Per-child time adjuster (isolated state) ── */
 function ChildTimeAdjuster({child, onAdjust, label, color}) {
-  const lbl   = label || "⏱ MIN";
-  const clr   = color || "#0d9488";
-  const [showCustom, setShowCustom] = React.useState(false);
-  const [val, setVal] = React.useState("");
+  const lbl = label || "⏱ MIN";
+  const clr = color || "#0d9488";
+  const isPoints = lbl.includes("POÄNG");
+  const current = isPoints ? (child.points||0) : (child.balance||0);
+  const [inputVal, setInputVal] = React.useState("");
 
-  const applyCustom = (sign) => {
-    const v = Math.abs(parseInt(val));
-    if (isNaN(v) || v === 0) return;
-    onAdjust(child.id, sign * v);
-    setVal(""); setShowCustom(false);
+  const parsed = parseInt(inputVal) || 0;
+  const preview = current + parsed;
+
+  const quickApply = (delta) => {
+    onAdjust(child.id, delta);
   };
 
-  return React.createElement('div', {style:{marginBottom:14}}
+  const applyInput = () => {
+    if (parsed === 0) return;
+    onAdjust(child.id, parsed);
+    setInputVal("");
+  };
 
-    /* Compact row: label + quick buttons + custom toggle */
-    , React.createElement('div', {style:{display:"flex",alignItems:"center",gap:4,flexWrap:"nowrap"}}
-      , React.createElement('span', {style:{fontSize:10,fontWeight:800,color:clr,
-          letterSpacing:1,marginRight:2,whiteSpace:"nowrap"}}, lbl)
-      , [-15,-5,5,15].map(v=>
+  const QUICK = [1, 5, 10, -5, -10];
+
+  return React.createElement('div', {style:{marginBottom:12}}
+
+    /* Label + current value */
+    , React.createElement('div', {style:{display:"flex", alignItems:"center",
+        justifyContent:"space-between", marginBottom:6}}
+      , React.createElement('span', {style:{fontSize:11, fontWeight:700, color:"#8e8e93",
+          letterSpacing:".06em", textTransform:"uppercase"}}, lbl)
+      , React.createElement('span', {style:{fontSize:13, fontWeight:800, color:clr}},
+          current + (isPoints ? " ⭐" : " min"))
+    )
+
+    /* Quick buttons */
+    , React.createElement('div', {style:{display:"flex", gap:4, flexWrap:"wrap", marginBottom:8}}
+      , QUICK.map(v =>
           React.createElement('button', {key:v, className:"btn-big",
-            onClick:()=>onAdjust(child.id,v),
-            style:{padding:"4px 7px",borderRadius:8,border:"none",cursor:"pointer",
-              fontWeight:800,fontSize:12,flexShrink:0,
-              background:v>0?"#d1fae5":"#fee2e2",
-              color:v>0?"#059669":"#ef4444"}},
-            v>0?"+":"", v
-          )
-        )
-      , React.createElement('button', {className:"btn-big",
-          onClick:()=>setShowCustom(s=>!s),
-          style:{padding:"4px 7px",borderRadius:8,border:"1.5px solid #e2e8f0",
-            background: showCustom?"#f1f5f9":"white",flexShrink:0,
-            cursor:"pointer",fontWeight:700,fontSize:12,color:"#6d6d72"}},
-          showCustom ? "✕" : "✏️"
+            onClick: () => quickApply(v),
+            style:{flex:"1 1 auto", padding:"8px 4px", borderRadius:9, border:"none",
+              cursor:"pointer", fontWeight:800, fontSize:12,
+              background: v > 0 ? "#dcfce7" : "#fee2e2",
+              color: v > 0 ? "#15803d" : "#b91c1c",
+              minWidth:40}},
+            (v > 0 ? "+" : "") + v)
         )
     )
 
-    /* Custom input — inline, only when open */
-    , showCustom && React.createElement('div', {className:"bounce-in",
-        style:{display:"flex",gap:7,alignItems:"center",marginTop:8}}
-      , React.createElement('input', {value:val,
-          onChange:e=>setVal(e.target.value),
-          onKeyDown:e=>e.key==="Enter"&&applyCustom(1),
-          placeholder: lbl==="⭐ POÄNG" ? "Antal poäng…" : "Antal min…", type:"number", min:"0",
-          style:{width:110,border:"2px solid #e2e8f0",borderRadius:9,
-            padding:"7px 10px",fontSize:13,boxSizing:"border-box"}})
-      , React.createElement('button', {className:"btn-big", onClick:()=>applyCustom(1),
-          style:{background:clr,border:"none",borderRadius:9,padding:"7px 12px",
-            color:"white",fontWeight:800,fontSize:13,cursor:"pointer"}}, "+")
-      , React.createElement('button', {className:"btn-big", onClick:()=>applyCustom(-1),
-          style:{background:"#ef4444",border:"none",borderRadius:9,padding:"7px 12px",
-            color:"white",fontWeight:800,fontSize:13,cursor:"pointer"}}, "−")
+    /* Direct input + apply */
+    , React.createElement('div', {style:{display:"flex", gap:6, alignItems:"stretch"}}
+      , React.createElement('div', {style:{flex:1, position:"relative"}}
+        , React.createElement('input', {
+            type:"number",
+            value: inputVal,
+            onChange: e => setInputVal(e.target.value),
+            onKeyDown: e => e.key === "Enter" && applyInput(),
+            placeholder: "Exakt värde (+ eller −)…",
+            style:{width:"100%", border:".5px solid rgba(0,0,0,0.12)",
+              borderRadius:10, padding:"9px 12px", fontSize:14,
+              boxSizing:"border-box",
+              borderColor: parsed !== 0 ? clr : "rgba(0,0,0,0.12)"}})
+        /* Live preview */
+        , parsed !== 0 && React.createElement('div', {style:{
+            position:"absolute", right:10, top:"50%",
+            transform:"translateY(-50%)",
+            fontSize:11, fontWeight:700,
+            color: preview >= 0 ? "#15803d" : "#b91c1c"}},
+            "→ " + preview)
+      )
+      , React.createElement('button', {
+          onClick: applyInput,
+          disabled: parsed === 0,
+          style:{padding:"9px 14px", borderRadius:10, border:"none",
+            cursor: parsed === 0 ? "default" : "pointer",
+            fontWeight:800, fontSize:13, flexShrink:0,
+            background: parsed === 0 ? "#f2f2f7" : parsed > 0 ? clr : "#ef4444",
+            color: parsed === 0 ? "#aeaeb2" : "white"}},
+          parsed > 0 ? "+" + parsed : parsed < 0 ? parsed : "Ange")
     )
   );
 }
@@ -5694,24 +5769,32 @@ function RoutineRunner({child, session, onToggleRunning, onSkipStep, onUncheckSt
                     "Hoppa ▾")
               )
 
-          /* Klar-knapp (checklist/points/tid-steg) */
+          /* Klar-knapp + Hoppa (checklist/points/tid-steg) */
             : (() => {
                 const allDone = completed.length === steps.length;
                 const isLast  = stepIdx + 1 >= steps.length;
                 const lastStepDone = completed.includes(stepIdx);
                 const blocked = isLast && !lastStepDone && !allDone;
-                return React.createElement("div", {style:{marginBottom:8}}
+                return React.createElement("div", {style:{display:"flex", gap:8, marginBottom:8}}
                   , React.createElement("button", {
                       onClick: blocked ? null : () => onCheckStep(stepIdx),
                       disabled: blocked,
-                      style:{width:"100%",
+                      style:{flex:1,
                         background: blocked ? "#f2f2f7" : cTheme.accent,
                         border:"none", borderRadius:12, padding:"14px",
                         color: blocked ? "#aeaeb2" : "white",
                         fontWeight:800, fontSize:15,
                         cursor: blocked ? "not-allowed" : "pointer"}},
-                      blocked ? "Bocka av i listan ovan"
+                      blocked ? "Bocka av ovan"
                       : isLast ? "✅  Klar & avsluta" : "✅  Klar!")
+                  , React.createElement("button", {
+                      onClick: () => setShowSkipPicker(v=>!v),
+                      style:{padding:"14px 16px",
+                        background: showSkipPicker ? "#edeafb" : "#f2f2f7",
+                        border: showSkipPicker ? ".5px solid #6c5cc8" : ".5px solid rgba(0,0,0,0.08)",
+                        borderRadius:12, cursor:"pointer", fontWeight:700, fontSize:13,
+                        color: showSkipPicker ? "#6c5cc8" : "#6d6d72"}},
+                      "Hoppa ▾")
                 );
               })()
 
@@ -7251,7 +7334,7 @@ function SettingsView({data, setData, showToast, timerStates, setTimerStates, on
                           onChange: e => {
                             const file = e.target.files[0]; if (!file) return;
                             const reader = new FileReader();
-                            reader.onload = ev => setAddAvatar(ev.target.result);
+                            reader.onload = ev => compressImage(ev.target.result, setAddAvatar);
                             reader.readAsDataURL(file); e.target.value="";
                           }})
                     )
@@ -7266,7 +7349,7 @@ function SettingsView({data, setData, showToast, timerStates, setTimerStates, on
                           onChange: e => {
                             const file = e.target.files[0]; if (!file) return;
                             const reader = new FileReader();
-                            reader.onload = ev => setAddAvatar(ev.target.result);
+                            reader.onload = ev => compressImage(ev.target.result, setAddAvatar);
                             reader.readAsDataURL(file); e.target.value="";
                           }})
                     )
@@ -7797,7 +7880,7 @@ function SettingsView({data, setData, showToast, timerStates, setTimerStates, on
                         const file = e.target.files[0];
                         if (!file) return;
                         const reader = new FileReader();
-                        reader.onload = ev => setEditAvatar(ev.target.result);
+                        reader.onload = ev => compressImage(ev.target.result, setEditAvatar);
                         reader.readAsDataURL(file);
                         e.target.value = "";
                       }})
@@ -7817,7 +7900,7 @@ function SettingsView({data, setData, showToast, timerStates, setTimerStates, on
                         const file = e.target.files[0];
                         if (!file) return;
                         const reader = new FileReader();
-                        reader.onload = ev => setEditAvatar(ev.target.result);
+                        reader.onload = ev => compressImage(ev.target.result, setEditAvatar);
                         reader.readAsDataURL(file);
                         e.target.value = "";
                       }})
@@ -8891,8 +8974,14 @@ ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js')
-          .catch(err => console.warn('SW:', err));
+        // Only register SW on production (GitHub Pages), not in preview environments
+        const isProduction = location.hostname !== 'localhost' &&
+                             !location.hostname.includes('claude') &&
+                             !location.hostname.includes('anthropic');
+        if (isProduction) {
+          navigator.serviceWorker.register('./sw.js')
+            .catch(err => console.warn('SW registration failed:', err));
+        }
       });
     }
   </script>
