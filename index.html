@@ -74,6 +74,7 @@
     .action-btn:hover{background:var(--action-hover-bg)!important;}
     .action-btn:active{transform:scale(0.93);background:var(--action-active-bg)!important;}
     .drag-item{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent;}
+    @keyframes rotateSpin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
     .hold-stop{
       -webkit-touch-callout:none;
       -webkit-user-select:none;
@@ -8362,6 +8363,59 @@ const StableEarnDialog = React.memo(function StableEarnDialog({
   });
 }, () => true); // never re-render from parent — dialog manages its own lifecycle
 
+/* RotatePill — floats bottom-right in landscape, hints user to rotate back to portrait */
+const RotatePill = React.memo(function RotatePill() {
+  const [visible,   setVisible]   = React.useState(false);
+  const [dismissed, setDismissed] = React.useState(false);
+
+  React.useEffect(() => {
+    const check = () => {
+      const isLandscape = window.innerWidth > window.innerHeight;
+      setVisible(isLandscape);
+      // Reset dismiss when rotated back to portrait
+      if (!isLandscape) setDismissed(false);
+    };
+    check();
+    window.addEventListener("resize", check);
+    window.addEventListener("orientationchange", check);
+    return () => {
+      window.removeEventListener("resize", check);
+      window.removeEventListener("orientationchange", check);
+    };
+  }, []);
+
+  if (!visible || dismissed) return null;
+
+  return React.createElement("div", {
+    style: {
+      position: "fixed",
+      bottom: "calc(20px + env(safe-area-inset-bottom))",
+      right: "calc(16px + env(safe-area-inset-right))",
+      zIndex: 9999,
+      display: "flex", alignItems: "center", gap: 6,
+      background: "rgba(28,28,30,0.82)",
+      backdropFilter: "blur(8px)",
+      WebkitBackdropFilter: "blur(8px)",
+      borderRadius: 50,
+      padding: "8px 14px 8px 10px",
+      boxShadow: "0 4px 16px rgba(0,0,0,0.25)",
+      cursor: "pointer",
+      userSelect: "none", WebkitUserSelect: "none"
+    },
+    onClick: () => setDismissed(true)
+  }
+    , React.createElement("span", {
+        style: {fontSize: 18, lineHeight: 1,
+          display: "inline-block", animation: "rotateSpin 2s linear infinite"}}, "↺")
+    , React.createElement("span", {
+        style: {fontSize: 12, fontWeight: 700, color: "white", whiteSpace: "nowrap"}},
+        "Rotera")
+    , React.createElement("span", {
+        style: {fontSize: 13, color: "rgba(255,255,255,0.5)", marginLeft: 2,
+          fontWeight: 700, lineHeight: 1}}, "✕")
+  );
+});
+
 function App() {
   const [data,          setData]          = useState(loadData);
   const [view,          setViewRaw]       = useState(() => {
@@ -9036,6 +9090,9 @@ function App() {
           showVictory: showVictory,
           burst: burst
         })
+
+      /* ── Rotate pill — shown in landscape to hint portrait is better ── */
+      , React.createElement(RotatePill)
     )
   );
 }
