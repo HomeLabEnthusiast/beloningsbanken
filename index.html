@@ -10,7 +10,28 @@
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="theme-color" content="#6c5cc8" />
   <link rel="apple-touch-icon" href="icons/icon-192.png" />
-  <link rel="manifest" href="manifest.json" />
+
+  <!-- Inline manifest — orientation:any so device rotation works freely -->
+  <script>
+    const _manifest = {
+      name: "Belöningsbanken",
+      short_name: "Belöningsbanken",
+      start_url: ".",
+      display: "standalone",
+      orientation: "any",
+      background_color: "#f2f2f7",
+      theme_color: "#6c5cc8",
+      icons: [
+        { src: "icons/icon-192.png", sizes: "192x192", type: "image/png" },
+        { src: "icons/icon-512.png", sizes: "512x512", type: "image/png" }
+      ]
+    };
+    const _blob = new Blob([JSON.stringify(_manifest)], {type:"application/json"});
+    const _url  = URL.createObjectURL(_blob);
+    const _link = document.createElement("link");
+    _link.rel = "manifest"; _link.href = _url;
+    document.currentScript.after(_link);
+  </script>
 
   <!-- v1772630574 -->
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
