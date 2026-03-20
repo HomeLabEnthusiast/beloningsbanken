@@ -8369,18 +8369,40 @@ const RotatePill = React.memo(function RotatePill() {
   const [dismissed, setDismissed] = React.useState(false);
 
   React.useEffect(() => {
-    const check = () => {
-      const isLandscape = window.innerWidth > window.innerHeight;
-      setVisible(isLandscape);
-      // Reset dismiss when rotated back to portrait
-      if (!isLandscape) setDismissed(false);
+    const isLandscape = () => {
+      // Use screen.orientation if available (Android, modern iOS)
+      if (window.screen && window.screen.orientation && window.screen.orientation.type) {
+        return window.screen.orientation.type.includes("landscape");
+      }
+      // Fallback: window.orientation (iOS legacy — 90 or -90 = landscape)
+      if (typeof window.orientation !== "undefined") {
+        return Math.abs(window.orientation) === 90;
+      }
+      // Desktop fallback
+      return window.innerWidth > window.innerHeight;
     };
+
+    const check = () => {
+      const land = isLandscape();
+      setVisible(land);
+      if (!land) setDismissed(false);
+    };
+
+    // Small delay on mobile — iOS fires orientationchange before layout updates
+    const checkDelayed = () => setTimeout(check, 150);
+
     check();
-    window.addEventListener("resize", check);
-    window.addEventListener("orientationchange", check);
+    window.addEventListener("resize", checkDelayed);
+    window.addEventListener("orientationchange", checkDelayed);
+    if (window.screen && window.screen.orientation) {
+      window.screen.orientation.addEventListener("change", checkDelayed);
+    }
     return () => {
-      window.removeEventListener("resize", check);
-      window.removeEventListener("orientationchange", check);
+      window.removeEventListener("resize", checkDelayed);
+      window.removeEventListener("orientationchange", checkDelayed);
+      if (window.screen && window.screen.orientation) {
+        window.screen.orientation.removeEventListener("change", checkDelayed);
+      }
     };
   }, []);
 
@@ -8400,12 +8422,13 @@ const RotatePill = React.memo(function RotatePill() {
       padding: "8px 14px 8px 10px",
       boxShadow: "0 4px 16px rgba(0,0,0,0.25)",
       cursor: "pointer",
+      WebkitTapHighlightColor: "transparent",
       userSelect: "none", WebkitUserSelect: "none"
     },
     onClick: () => setDismissed(true)
   }
     , React.createElement("span", {
-        style: {fontSize: 18, lineHeight: 1,
+        style: {fontSize: 18, lineHeight: 1, color: "white",
           display: "inline-block", animation: "rotateSpin 2s linear infinite"}}, "↺")
     , React.createElement("span", {
         style: {fontSize: 12, fontWeight: 700, color: "white", whiteSpace: "nowrap"}},
