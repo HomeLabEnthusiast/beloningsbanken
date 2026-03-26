@@ -8570,46 +8570,65 @@ const RotatePill = React.memo(function RotatePill() {
 /* ═══════════════ BOTTOM NAV ════════════════════════════════════════════════ */
 function BottomNav({canGoBack, canGoForward, onBack, onForward, onHome, onAdmin, currentView, timerRunning}) {
   if (timerRunning) return null;
-  const btnBase = {
-    display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center",
-    gap:3, border:"none", background:"none", cursor:"pointer", padding:"8px 4px",
-    WebkitTapHighlightColor:"transparent", userSelect:"none"
-  };
-  const iconStyle = (active, disabled) => ({
-    fontSize:22, lineHeight:1,
-    opacity: disabled ? 0.28 : 1,
-    color: active ? "#f97316" : "#6d6d72"
-  });
-  const labelStyle = (active, disabled) => ({
-    fontSize:10, fontWeight:700, letterSpacing:"-.2px",
-    color: active ? "#f97316" : "#6d6d72",
-    opacity: disabled ? 0.28 : 1
-  });
   const isHome     = currentView === "home";
   const isSettings = currentView === "settings";
-  return React.createElement("div", {style:{
+
+  /* Wrapper — kritvit bakgrund, ingen peach */
+  const barStyle = {
     position:"fixed", bottom:0, left:0, right:0,
-    background:"rgba(253,248,242,0.97)",
-    backdropFilter:"blur(14px)",
-    WebkitBackdropFilter:"blur(14px)",
-    borderTop:"0.5px solid #ece9e2",
+    background:"#faf9f7",
+    borderTop:"0.5px solid #e8e5e0",
     display:"grid", gridTemplateColumns:"1fr 1fr 1fr 1fr",
-    paddingBottom:"env(safe-area-inset-bottom)",
+    gap:4,
+    padding:"6px 8px",
+    paddingBottom:"calc(6px + env(safe-area-inset-bottom))",
     zIndex:200
-  }}
-    , React.createElement("button", {style:btnBase, onClick: isHome ? null : onHome}
+  };
+
+  /* Knapp-stil B: upphöjd med box-shadow när aktiv/tillgänglig, flat+genomskinlig när inaktiv */
+  const btn = (active, disabled) => ({
+    display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center",
+    gap:3, border:"none", cursor: disabled ? "default" : "pointer",
+    padding:"7px 4px", borderRadius:10,
+    WebkitTapHighlightColor:"transparent", userSelect:"none",
+    background: active ? "#ffffff" : disabled ? "transparent" : "#ffffff",
+    boxShadow: disabled ? "none" : "0 1px 3px rgba(0,0,0,0.11), 0 0 0 0.5px #e4e1db",
+    opacity: disabled ? 0.32 : 1,
+    transition:"opacity 0.15s"
+  });
+
+  const iconStyle = (active, disabled) => ({
+    fontSize:20, lineHeight:1,
+    color: active ? "#f97316" : "#3c3c43"
+  });
+
+  const labelStyle = (active, disabled) => ({
+    fontSize:9, fontWeight:700, letterSpacing:"-.1px",
+    color: active ? "#f97316" : "#5f5e5a"
+  });
+
+  /* SVG-pilar så de alltid syns tydligt oavsett storlek */
+  const ArrowLeft = () => React.createElement("svg", {width:18, height:18, viewBox:"0 0 24 24", fill:"none", style:{flexShrink:0}}
+    , React.createElement("polyline", {points:"15 18 9 12 15 6", stroke: canGoBack ? "#3c3c43" : "#9e9b96", strokeWidth:"2.2", strokeLinecap:"round", strokeLinejoin:"round"})
+  );
+  const ArrowRight = () => React.createElement("svg", {width:18, height:18, viewBox:"0 0 24 24", fill:"none", style:{flexShrink:0}}
+    , React.createElement("polyline", {points:"9 6 15 12 9 18", stroke: canGoForward ? "#3c3c43" : "#9e9b96", strokeWidth:"2.2", strokeLinecap:"round", strokeLinejoin:"round"})
+  );
+
+  return React.createElement("div", {style:barStyle}
+    , React.createElement("button", {style:btn(isHome, false), onClick: isHome ? null : onHome}
       , React.createElement("span", {style:iconStyle(isHome, false)}, "🏠")
       , React.createElement("span", {style:labelStyle(isHome, false)}, "Hem")
     )
-    , React.createElement("button", {style:btnBase, onClick: canGoBack ? onBack : null, disabled:!canGoBack}
-      , React.createElement("span", {style:iconStyle(false, !canGoBack)}, "←")
+    , React.createElement("button", {style:btn(false, !canGoBack), onClick: canGoBack ? onBack : null}
+      , React.createElement(ArrowLeft)
       , React.createElement("span", {style:labelStyle(false, !canGoBack)}, "Bakåt")
     )
-    , React.createElement("button", {style:btnBase, onClick: canGoForward ? onForward : null, disabled:!canGoForward}
-      , React.createElement("span", {style:iconStyle(false, !canGoForward)}, "→")
+    , React.createElement("button", {style:btn(false, !canGoForward), onClick: canGoForward ? onForward : null}
+      , React.createElement(ArrowRight)
       , React.createElement("span", {style:labelStyle(false, !canGoForward)}, "Framåt")
     )
-    , React.createElement("button", {style:btnBase, onClick: onAdmin}
+    , React.createElement("button", {style:btn(isSettings, false), onClick: onAdmin}
       , React.createElement("span", {style:iconStyle(isSettings, false)}, "⚙️")
       , React.createElement("span", {style:labelStyle(isSettings, false)}, "Admin")
     )
@@ -9020,7 +9039,7 @@ function App() {
     React.createElement('div', { style: {minHeight:"100vh", background:"#f2f2f7", paddingBottom:72}}
 
       , React.createElement('header', { style: {
-        background:"rgba(253,248,242,0.95)",
+        background:"rgba(250,249,247,0.97)",
         backdropFilter:"blur(14px)",
         WebkitBackdropFilter:"blur(14px)",
         paddingLeft:"max(20px, env(safe-area-inset-left))",
@@ -9029,7 +9048,7 @@ function App() {
         height:"calc(54px + env(safe-area-inset-top))",
         display:"flex", alignItems:"flex-end", justifyContent:"space-between",
         paddingBottom:"8px",
-        boxShadow:"0 .5px 0 #ece9e2",
+        boxShadow:"0 .5px 0 #e8e5e0",
         position:"sticky", top:0, zIndex:100}}
         , React.createElement('div', { style: {display:"flex",alignItems:"center",gap:10}})
         , React.createElement('div', { style: {display:"flex",alignItems:"center",gap:10}}
