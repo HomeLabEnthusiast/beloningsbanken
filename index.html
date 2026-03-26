@@ -368,8 +368,12 @@ const saveSession = (routineSessions, timerStates, view, activeChild) => {
     Object.entries(timerStates).forEach(([id, t]) => {
       if (!t) return;
       // Never persist phase:done — it would re-trigger EarnChoiceDialog on reload
+      const now = Date.now();
+      const frozenElapsed = (t.phase === "running" && t.startedAt)
+        ? (t.elapsed||0) + Math.floor((now - t.startedAt)/1000)
+        : (t.elapsed||0);
       const phase = t.phase === "running" ? "paused" : (t.phase === "done" ? "idle" : t.phase);
-      pausedTimers[id] = {...t, running: false, phase};
+      pausedTimers[id] = {...t, running: false, phase, elapsed: frozenElapsed, startedAt: null, seconds: frozenElapsed};
     });
     localStorage.setItem(SESSION_KEY, JSON.stringify({
       routineSessions: pausedRoutines,
@@ -3659,7 +3663,7 @@ function TimerPanel({child, updateChild, showToast, activities, activityCategori
 
       , phase === "idle" && (
         React.createElement('button', { className: "btn-big",
-          onClick: () => setTimerState(p => ({...p, running:true, phase:"running"})),
+          onClick: () => setTimerState(p => ({...p, running:true, phase:"running", startedAt:Date.now(), elapsed:p.startedAt ? (p.elapsed||0)+Math.floor((Date.now()-p.startedAt)/1000) : (p.elapsed||0)})),
           style: circleBtn(act.color||"#f97316", "0 4px 16px rgba(0,0,0,0.12)")}
           , React.createElement('span', { style: {fontSize:iconSz}}, "▶")
           , React.createElement('span', { style: {fontSize:lblSz}}, "START")
@@ -3722,7 +3726,7 @@ function TimerView({child, updateChild, showToast, activities, activityCategorie
   }))).sort((a,b) => a.label.localeCompare(b.label, "sv"));
   const acts = allCatActs.length ? allCatActs : (activities || DEFAULT_ACTIVITIES);
 
-  const blank = {seconds:0, running:false, activity:acts[0], phase:"idle"};
+  const blank = {seconds:0, elapsed:0, startedAt:null, running:false, activity:acts[0], phase:"idle"};
   const timerState = timerStates[child.id] || blank;
   const setTimerState = updFn =>
     setTimerStates(prev => ({
@@ -3960,7 +3964,7 @@ function TimerView({child, updateChild, showToast, activities, activityCategorie
 
             /* Idle: small start button under ring */
             , phase === "idle" && React.createElement('button', {
-                onClick: () => setTimerState(p => ({...p, running:true, phase:"running"})),
+                onClick: () => setTimerState(p => ({...p, running:true, phase:"running", startedAt:Date.now(), elapsed:p.startedAt ? (p.elapsed||0)+Math.floor((Date.now()-p.startedAt)/1000) : (p.elapsed||0)})),
                 style: {
                   marginTop: 8,
                   background: accentColor, color:"white", border:"none",
@@ -3980,7 +3984,7 @@ function TimerView({child, updateChild, showToast, activities, activityCategorie
           /* Left: Pausa / Fortsätt */
           , phase === "running"
             ? React.createElement('button', {
-                onClick: () => setTimerState(p => ({...p, running:false, phase:"paused"})),
+                onClick: () => setTimerState(p => ({...p, running:false, phase:"paused", elapsed: p.startedAt ? (p.elapsed||0)+Math.floor((Date.now()-p.startedAt)/1000) : (p.elapsed||0), startedAt: null})),
                 style: {
                   background: "none", border: "none",
                   borderRight: ".5px solid rgba(0,0,0,0.07)",
@@ -3990,7 +3994,7 @@ function TimerView({child, updateChild, showToast, activities, activityCategorie
                 React.createElement('span', {style:{fontSize:13}}, "⏸"), " Pausa"
               )
             : React.createElement('button', {
-                onClick: () => setTimerState(p => ({...p, running:true, phase:"running"})),
+                onClick: () => setTimerState(p => ({...p, running:true, phase:"running", startedAt:Date.now(), elapsed:p.startedAt ? (p.elapsed||0)+Math.floor((Date.now()-p.startedAt)/1000) : (p.elapsed||0)})),
                 style: {
                   background: "none", border: "none",
                   borderRight: ".5px solid rgba(0,0,0,0.07)",
@@ -4006,7 +4010,7 @@ function TimerView({child, updateChild, showToast, activities, activityCategorie
                 onStop: () => {
                   if (secs < 5) { showToast("⚡ För kort!"); return; }
                   if (timerState.phase === "done") return; // guard repeat touch
-                  setTimerState(p => ({...p, running:false, phase:"done"}));
+                  setTimerState(p => ({...p, running:false, phase:"done", elapsed: p.startedAt ? (p.elapsed||0)+Math.floor((Date.now()-p.startedAt)/1000) : (p.elapsed||0), startedAt: null}));
                   const rawMins = Math.ceil(secs / 60);
                   const mins = (act && act.rewardType === "fixed" && act.fixedMinutes) ? act.fixedMinutes : rawMins;
                   const ratio = (act && act.pointRatio) ? act.pointRatio : 1;
@@ -4170,7 +4174,7 @@ function AddThemePicker({value, onChange}) {
 
 const SplitKidCard = React.memo(function SplitKidCard({kid, timerState, setTimerState, acts, showToast, updateChild, setView, setSplitSessionIds, setActiveChild, kidList, timerStates, landscape}) {
   const col = (() => { const t = getTheme(kid); return {bg:t.bg, border:t.border, accent:t.accent, chip:t.chip, chipText:t.chipText, headerBg:t.headerBg}; })();
-  const blank = {seconds:0, running:false, activity:acts[0], phase:"idle"};
+  const blank = {seconds:0, elapsed:0, startedAt:null, running:false, activity:acts[0], phase:"idle"};
   const [earnChoice, setEarnChoice] = React.useState(null);
   const firedRef = React.useRef(false);
 
@@ -4347,7 +4351,7 @@ const SplitKidCard = React.memo(function SplitKidCard({kid, timerState, setTimer
           display:"grid", gridTemplateColumns:"1fr 1fr"}}
         , phase === "running"
           ? React.createElement('button', {
-              onClick: () => setTimerState(p => ({...p, running:false, phase:"paused"})),
+              onClick: () => setTimerState(p => ({...p, running:false, phase:"paused", elapsed: p.startedAt ? (p.elapsed||0)+Math.floor((Date.now()-p.startedAt)/1000) : (p.elapsed||0), startedAt: null})),
               style: {background:"none", border:"none",
                 borderRight:".5px solid rgba(0,0,0,0.07)",
                 padding:"9px 0", fontSize:12, fontWeight:500,
@@ -4355,7 +4359,7 @@ const SplitKidCard = React.memo(function SplitKidCard({kid, timerState, setTimer
                 display:"flex", alignItems:"center", justifyContent:"center", gap:5}},
               React.createElement('span',{style:{fontSize:13}},"⏸"), " Pausa")
           : React.createElement('button', {
-              onClick: () => setTimerState(p => ({...p, running:true, phase:"running"})),
+              onClick: () => setTimerState(p => ({...p, running:true, phase:"running", startedAt:Date.now(), elapsed:p.startedAt ? (p.elapsed||0)+Math.floor((Date.now()-p.startedAt)/1000) : (p.elapsed||0)})),
               style: {background:"none", border:"none",
                 borderRight:".5px solid rgba(0,0,0,0.07)",
                 padding:"9px 0", fontSize:12, fontWeight:500,
@@ -4368,7 +4372,7 @@ const SplitKidCard = React.memo(function SplitKidCard({kid, timerState, setTimer
                 if (secs < 5) { showToast("⚡ För kort!"); return; }
                 if (firedRef.current) return;
                 firedRef.current = true;
-                setTimerState(p => ({...p, running:false, phase:"done"}));
+                setTimerState(p => ({...p, running:false, phase:"done", elapsed: p.startedAt ? (p.elapsed||0)+Math.floor((Date.now()-p.startedAt)/1000) : (p.elapsed||0), startedAt: null}));
                 const rawMins = Math.ceil(secs / 60);
                 const mins = (act && act.rewardType === "fixed" && act.fixedMinutes) ? act.fixedMinutes : rawMins;
                 const ratio = (act && act.pointRatio) ? act.pointRatio : 1;
@@ -4404,7 +4408,7 @@ function SplitTimerView({kidList, updateChild, showToast, activities, activityCa
     ...a, color: a.color || c.color || "#f97316"
   }))).sort((a,b) => a.label.localeCompare(b.label, "sv"));
   const acts = allCatActs.length ? allCatActs : (activities && activities.length ? activities : DEFAULT_ACTIVITIES);
-  const blank = {seconds:0, running:false, activity:acts[0], phase:"idle"};
+  const blank = {seconds:0, elapsed:0, startedAt:null, running:false, activity:acts[0], phase:"idle"};
   const landscape = useOrientation();
 
   return (
@@ -7171,7 +7175,7 @@ function SettingsView({data, setData, showToast, timerStates, setTimerStates, on
   });
 
   return (
-    React.createElement('div', { style: {padding:"24px 20px",maxWidth:720,margin:"0 auto",minHeight:"100vh",background:"#f2f2f7"}}
+    React.createElement('div', { style: {padding:"24px 20px",maxWidth:720,margin:"0 auto",minHeight:"100vh",background:"#ffffff"}}
       /* ── EXPORT MODAL (inline) ── */
       , showExportModal && (() => {
           const EXPORT_ITEMS = [
@@ -8433,7 +8437,7 @@ const StableEarnDialog = React.memo(function StableEarnDialog({
 
   const resetTimer = () => {
     setTimerStates(prev => ({...prev,
-      [childObj.id]: {seconds:0, running:false,
+      [childObj.id]: {seconds:0, elapsed:0, startedAt:null, running:false,
         activity: (prev[childObj.id]||{}).activity || null, phase:"idle"}
     }));
     closeEarnDialog();
@@ -8569,7 +8573,6 @@ const RotatePill = React.memo(function RotatePill() {
 
 /* ═══════════════ BOTTOM NAV ════════════════════════════════════════════════ */
 function BottomNav({canGoBack, canGoForward, onBack, onForward, onHome, onAdmin, currentView, timerRunning}) {
-  if (timerRunning) return null;
   const isHome     = currentView === "home";
   const isSettings = currentView === "settings";
 
@@ -8854,23 +8857,46 @@ function App() {
     return () => window.removeEventListener('beforeunload', handleUnload);
   }, [data, routineSessions, timerStates]);
 
-  // Global tick: increment seconds for every "running" timer every second
+  // Global tick — wall-clock based so background/foreground doesn't lose time
+  // Each running timer stores startedAt (ms epoch). seconds = elapsed + (now - startedAt).
   const globalTickRef = useRef(null);
-  useEffect(() => {
-    globalTickRef.current = setInterval(() => {
-      setTimerStates(prev => {
-        const hasRunning = Object.values(prev).some(ts => ts && ts.phase === "running");
-        if (!hasRunning) return prev;
-        const next = {...prev};
-        Object.keys(next).forEach(id => {
-          if (next[id] && next[id].phase === "running") {
-            next[id] = {...next[id], seconds: (next[id].seconds || 0) + 1};
-          }
-        });
-        return next;
+
+  // Recalculate all running timers from wall-clock time
+  const resyncTimers = () => {
+    setTimerStates(prev => {
+      const hasRunning = Object.values(prev).some(ts => ts && ts.phase === "running");
+      if (!hasRunning) return prev;
+      const now = Date.now();
+      const next = {...prev};
+      Object.keys(next).forEach(id => {
+        const ts = next[id];
+        if (ts && ts.phase === "running" && ts.startedAt) {
+          const wallElapsed = Math.floor((now - ts.startedAt) / 1000);
+          next[id] = {...ts, seconds: (ts.elapsed || 0) + wallElapsed};
+        }
       });
-    }, 1000);
-    return () => clearInterval(globalTickRef.current);
+      return next;
+    });
+  };
+
+  useEffect(() => {
+    // Tick every second to update display
+    globalTickRef.current = setInterval(resyncTimers, 1000);
+
+    // When app returns from background, immediately resync
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") resyncTimers();
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+
+    // Also resync on focus (iOS Safari fires this when returning to tab)
+    window.addEventListener("focus", resyncTimers);
+
+    return () => {
+      clearInterval(globalTickRef.current);
+      document.removeEventListener("visibilitychange", handleVisibility);
+      window.removeEventListener("focus", resyncTimers);
+    };
   }, []);
 
   const showToast = msg => {
@@ -8975,7 +9001,7 @@ function App() {
   const keepAndGoHome = () => {
     setBackConfirm(false);
     setBackConfirmMode("default");
-    setView("home");
+    goHome();
   };
 
   const saveTimersAndGoHome = () => {
@@ -9005,7 +9031,7 @@ function App() {
     });
     setBackConfirm(false);
     setBackConfirmMode("default");
-    setView("home");
+    goHome();
   };
 
   const discardTimersAndGoHome = () => {
@@ -9016,7 +9042,7 @@ function App() {
     });
     setBackConfirm(false);
     setBackConfirmMode("default");
-    setView("home");
+    goHome();
   };
 
   const discardOneTimerAndGoHome = (childId) => {
@@ -9027,16 +9053,16 @@ function App() {
     });
     setBackConfirm(false);
     setBackConfirmMode("default");
-    setView("home");
+    goHome();
   };
 
   const handleBack = () => {
     if (hasRunningTimer()) setBackConfirm(true);
-    else setView("home");
+    else goBack();
   };
 
   return (
-    React.createElement('div', { style: {minHeight:"100vh", background:"#f2f2f7", paddingBottom:72}}
+    React.createElement('div', { style: {minHeight:"100vh", background:"#ffffff", paddingBottom:72}}
 
       , React.createElement('header', { style: {
         background:"rgba(250,249,247,0.97)",
@@ -9353,14 +9379,14 @@ function App() {
 
       /* ── Bottom navigation bar ── */
       , React.createElement(BottomNav, {
-          canGoBack:    histIdx > 0,
+          canGoBack:    histIdx > 0 || hasRunningTimer() || effectiveView === "timer" || effectiveView === "split-timer",
           canGoForward: histIdx < navHistory.length - 1,
-          onBack:    goBack,
+          onBack:    handleBack,
           onForward: goForward,
           onHome:    goHome,
           onAdmin:   () => { setAdminUnlocked(false); navigateTo("settings"); },
           currentView: effectiveView,
-          timerRunning: Object.values(timerStates).some(ts => ts && ts.phase === "running")
+          timerRunning: false
         })
 
       /* ── Rotate pill — shown in landscape to hint portrait is better ── */
