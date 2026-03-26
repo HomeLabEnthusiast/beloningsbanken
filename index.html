@@ -193,24 +193,34 @@ const _jsxFileName = "";
 function _optionalChain(ops) { let lastAccessLHS = undefined; let value = ops[0]; let i = 1; while (i < ops.length) { const op = ops[i]; const fn = ops[i + 1]; i += 2; if ((op === 'optionalAccess' || op === 'optionalCall') && value == null) { return undefined; } if (op === 'access' || op === 'optionalAccess') { lastAccessLHS = value; value = fn(value); } else if (op === 'call' || op === 'optionalCall') { value = fn((...args) => value.call(lastAccessLHS, ...args)); lastAccessLHS = undefined; } } return value; }
 const { useState, useEffect, useRef } = React;
 
-/* Hook — returns true when device is in landscape orientation */
+/* Hook — returns true when device is in landscape orientation.
+   Uses window.innerWidth > window.innerHeight as primary source.
+   orientationchange on iOS fires BEFORE dimensions update, so we
+   delay 150ms to let the browser finish the rotation layout. */
 function useOrientation() {
-  const isLandscape = () =>
-    typeof screen !== "undefined" && screen.orientation
-      ? screen.orientation.type.includes("landscape")
-      : window.innerWidth > window.innerHeight;
+  const readLandscape = () => window.innerWidth > window.innerHeight;
 
-  const [landscape, setLandscape] = React.useState(isLandscape());
+  const [landscape, setLandscape] = React.useState(readLandscape());
+  const timerRef = React.useRef(null);
 
   React.useEffect(() => {
-    const update = () => setLandscape(isLandscape());
+    const update = () => {
+      setLandscape(readLandscape());
+    };
+    const updateDelayed = () => {
+      clearTimeout(timerRef.current);
+      timerRef.current = setTimeout(update, 150);
+    };
+
     window.addEventListener("resize", update);
-    window.addEventListener("orientationchange", update);
-    if (screen.orientation) screen.orientation.addEventListener("change", update);
+    window.addEventListener("orientationchange", updateDelayed);
+    if (screen.orientation) screen.orientation.addEventListener("change", updateDelayed);
+
     return () => {
+      clearTimeout(timerRef.current);
       window.removeEventListener("resize", update);
-      window.removeEventListener("orientationchange", update);
-      if (screen.orientation) screen.orientation.removeEventListener("change", update);
+      window.removeEventListener("orientationchange", updateDelayed);
+      if (screen.orientation) screen.orientation.removeEventListener("change", updateDelayed);
     };
   }, []);
 
