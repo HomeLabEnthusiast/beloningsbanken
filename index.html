@@ -2806,7 +2806,7 @@ function ChildHistoryPanel({ child, getCats }) {
 
 /* ═══════════════ HOME / DASHBOARD ══════════════════════════════════════════ */
 /* ═══════════════ HOME / DASHBOARD ══════════════════════════════════════════ */
-function HomeView({data, setData, setView, setActiveChild, showToast, showVictory, updateChild, timerStates, routineSessions, setRoutineSessions}) {
+function HomeView({data, setData, setView, setActiveChild, showToast, showVictory, updateChild, timerStates, setTimerStates, routineSessions, setRoutineSessions}) {
   const landscape = useOrientation();
 
   /* ── Reward handlers (preserved from v2) ── */
@@ -9130,7 +9130,7 @@ function App() {
       , effectiveView === "home" && (
         React.createElement(HomeView, { data: data, setData: setData, setView: navigateTo,
           setActiveChild: setActiveChild, showToast: showToast, showVictory: showVictory,
-          updateChild: updateChild, timerStates: timerStates,
+          updateChild: updateChild, timerStates: timerStates, setTimerStates: setTimerStates,
           routineSessions: routineSessions, setRoutineSessions: setRoutineSessions})
       )
       , effectiveView === "timer" && (
