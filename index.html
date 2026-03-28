@@ -82,12 +82,12 @@
       touch-action:none;
       -webkit-tap-highlight-color:transparent;
     }
-    @media(min-width:640px){.split-timer-grid{flex-direction:row!important;align-items:flex-start!important;}}
+    @media(min-width:640px){.split-timer-grid{grid-template-columns:repeat(auto-fit,minmax(280px,1fr))!important;}}
 
     /* Landscape on phones — side by side cards, compact header */
     @media(max-height:500px) and (orientation:landscape){
-      .split-timer-grid{flex-direction:row!important;align-items:flex-start!important;gap:8px!important;}
-      .split-timer-grid > *{flex:1 1 0;min-width:0;}
+      .split-timer-grid{grid-template-columns:repeat(auto-fit,minmax(260px,1fr))!important;gap:8px!important;}
+      .split-timer-grid > *{min-width:0;}
       .app-header{padding:6px 14px!important;}
       .app-header .header-title{font-size:15px!important;}
       .timer-panel-wrap{padding:6px 8px!important;}
@@ -97,7 +97,7 @@
 
     /* Portrait phones — single column, full width */
     @media(max-width:639px) and (orientation:portrait){
-      .split-timer-grid{flex-direction:column!important;}
+      .split-timer-grid{grid-template-columns:1fr!important;}
       .home-child-grid{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))!important;}
     }
 
@@ -4212,7 +4212,7 @@ const SplitKidCard = React.memo(function SplitKidCard({kid, timerState, setTimer
     const nextKid = othersActive[0] || null;
 
     return React.createElement('div', { style: {
-        flex:"1 1 300px", minWidth:0, background:"white",
+        width:"100%", minWidth:0, background:"white",
         border:"0.5px solid #ece9e2", borderRadius:18,
         overflow:"hidden"}}
       , React.createElement('div', { style: {
@@ -4264,7 +4264,7 @@ const SplitKidCard = React.memo(function SplitKidCard({kid, timerState, setTimer
   /* ── ACTIVE card ── */
   return React.createElement(React.Fragment, {key: kid.id}
     , React.createElement('div', { style: {
-        flex:"1 1 300px", minWidth:0, background:"white",
+        width:"100%", minWidth:0, background:"white",
         border:"0.5px solid #ece9e2", borderRadius:18,
         overflow:"hidden"}}
 
@@ -4421,13 +4421,21 @@ function SplitTimerView({kidList, updateChild, showToast, activities, activityCa
   const blank = {seconds:0, elapsed:0, startedAt:null, running:false, activity:acts[0], phase:"idle"};
   const landscape = useOrientation();
 
+  const count = kidList.length;
+  // Responsive grid: 1 kid=1col, 2=2col, 3-4=2x2, 5+=auto-fit
+  const gridCols = count === 1
+    ? "1fr"
+    : count === 2
+      ? (landscape ? "1fr 1fr" : "1fr")
+      : "repeat(auto-fit, minmax(280px, 1fr))";
+
   return (
-    React.createElement('div', { style: {padding: landscape ? "6px 8px 16px" : "10px 8px 24px", maxWidth:1000, margin:"0 auto"}}
+    React.createElement('div', { style: {padding: landscape ? "6px 8px 16px" : "10px 8px 24px", maxWidth:1200, margin:"0 auto"}}
       , React.createElement('div', { className:"split-timer-grid", style: {
-          display:"flex",
-          flexDirection: landscape ? "row" : "column",
-          alignItems: landscape ? "flex-start" : "stretch",
-          gap: landscape ? 8 : 12
+          display:"grid",
+          gridTemplateColumns: gridCols,
+          gap: landscape ? 8 : 12,
+          alignItems:"start"
         }}
         , kidList.map((kid) => {
           const timerState = timerStates[kid.id] || blank;
@@ -8993,7 +9001,7 @@ function App() {
     ? splitSessionIds
     : splitEligibleIds;
 
-  const splitKids = splitSourceIds.slice(0, 2).map(id =>
+  const splitKids = splitSourceIds.map(id =>
     data.children.find(c => c.id === id)
   ).filter(Boolean);
 
