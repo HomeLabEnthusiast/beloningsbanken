@@ -8952,34 +8952,11 @@ function App() {
     )
   );
 
-  // Split view stays alive as long as at least 2 children were ever in the session
-  // AND at least 1 of them still has an active (running/paused) timer.
-  // This prevents the view collapsing when child 1 finishes but child 2 is still going.
-  const [splitSessionIds, setSplitSessionIds] = React.useState([]);
-  React.useEffect(() => {
-    if (splitEligibleIds.length >= 2) {
-      // Capture the session participants the moment split kicks in
-      setSplitSessionIds(prev => {
-        const merged = [...new Set([...prev, ...splitEligibleIds])];
-        return merged;
-      });
-    }
-    // Clear session when all timers are truly idle
-    if (splitEligibleIds.length === 0 && activeTimerIds.length === 0) {
-      setSplitSessionIds([]);
-    }
-  }, [splitEligibleIds.join(",")]);
-
-  const splitStillActive = splitSessionIds.length >= 2 &&
-    splitSessionIds.some(id =>
-      timerStates[id] && (
-        timerStates[id].phase === "running" ||
-        timerStates[id].phase === "paused" ||
-        timerStates[id].phase === "done" ||
-        timerStates[id].phase === "idle"
-      )
-    ) &&
-    activeTimerIds.length >= 1; // at least one child still running
+  // splitSessionIds removed — always use splitEligibleIds directly.
+  // This ensures all children with active timers are always shown, regardless
+  // of the order they started. setSplitSessionIds kept as no-op for compatibility.
+  const setSplitSessionIds = () => {};
+  const splitStillActive = splitEligibleIds.length >= 2;
 
 
 
@@ -8997,9 +8974,8 @@ function App() {
     : view;
 
   // The children shown in split view — use session ids if available, else eligible
-  const splitSourceIds = splitStillActive && splitSessionIds.length >= 2
-    ? splitSessionIds
-    : splitEligibleIds;
+  // Always use splitEligibleIds — it's always current and includes ALL active kids
+  const splitSourceIds = splitEligibleIds;
 
   const splitKids = splitSourceIds.map(id =>
     data.children.find(c => c.id === id)
