@@ -2967,7 +2967,7 @@ function HomeView({data, setData, setView, setActiveChild, showToast, showVictor
 
                   return React.createElement('div', {
                       key:child.id,
-                      onClick:()=>{setActiveChild(child.id);setView("timer");},
+                      onClick:()=>{setActiveChild(child.id);setTimerStates(prev => ({...prev, [child.id]: {...(prev[child.id]||{}), phase:"selecting", seconds:0, elapsed:0, startedAt:null, running:false}}));setView("timer");},
                       style:{display:"flex",flexDirection:"column",alignItems:"center",cursor:"pointer",flex:"0 0 auto"}
                     }
                     , React.createElement('div', {style:{
@@ -3454,7 +3454,7 @@ function HomeView({data, setData, setView, setActiveChild, showToast, showVictor
                 }}
                 /* Timer */
                 , React.createElement('button', { className:"action-btn",
-                    onClick:()=>{setActiveChild(child.id);setView("timer");},
+                    onClick:()=>{setActiveChild(child.id);setTimerStates(prev => ({...prev, [child.id]: {...(prev[child.id]||{}), phase:"selecting", seconds:0, elapsed:0, startedAt:null, running:false}}));setView("timer");},
                     style:{
                       "--action-hover-bg": cTheme.bg,
                       "--action-active-bg": cTheme.chip,
@@ -4194,6 +4194,9 @@ const SplitKidCard = React.memo(function SplitKidCard({kid, timerState, setTimer
   const ss    = String(secs % 60).padStart(2, "0");
   const act   = timerState.activity || acts[0];
   const accentColor = col.accent;
+  // "selecting" = child navigated to timer, choosing activity
+  // "idle" = child finished/never started (show done screen)
+  const isSelecting    = timerState && timerState.phase === "selecting";
   const hasNoActiveTimer = !timerState || timerState.phase === "idle";
 
   // Reset firedRef when phase resets
@@ -4202,7 +4205,8 @@ const SplitKidCard = React.memo(function SplitKidCard({kid, timerState, setTimer
   }, [phase]);
 
   /* ── IDLE card — shown after deposit or before starting ── */
-  if (hasNoActiveTimer) {
+  /* "selecting" skips this — child is choosing activity, show timer UI */
+  if (hasNoActiveTimer && !isSelecting) {
     // Find other kids that still have active timers
     const othersActive = (kidList||[]).filter(k =>
       k.id !== kid.id &&
@@ -4401,13 +4405,9 @@ const SplitKidCard = React.memo(function SplitKidCard({kid, timerState, setTimer
 
   );
 }, (prev, next) => {
-  // Don't re-render when earnChoice is open — prevents blink from timer ticks
   if (prev.kid.id !== next.kid.id) return false;
-  // Always re-render if earnChoice state might have changed (check via timerState.phase)
   if (prev.timerState.phase !== next.timerState.phase) return false;
-  // If done/idle phase (dialog might be open) — block re-render from second ticks
   if (next.timerState.phase === "done" || next.timerState.phase === "idle") return true;
-  // Otherwise allow normal re-render (running/paused — need second updates)
   return false;
 });
 
@@ -8729,11 +8729,11 @@ function App() {
     setHistIdx(0);
     setViewRaw('home');
     setActiveChild(null);
-    // Clean up idle timerStates — children who navigated to timer but never started
+    // Clean up selecting/idle timerStates — children who never started
     setTimerStates(prev => {
       const next = {...prev};
       Object.keys(next).forEach(id => {
-        if (next[id] && next[id].phase === 'idle') delete next[id];
+        if (next[id] && (next[id].phase === 'idle' || next[id].phase === 'selecting')) delete next[id];
       });
       return next;
     });
@@ -8948,9 +8948,10 @@ function App() {
     timerStates[id] && (timerStates[id].phase === "running" || timerStates[id].phase === "paused")
   );
 
-  // Split-eligible: children with genuinely active timers (running, paused, or done)
+  // Split-eligible: children selecting, running, paused, or done
   const splitEligibleIds = Object.keys(timerStates).filter(id =>
     timerStates[id] && (
+      timerStates[id].phase === "selecting" ||
       timerStates[id].phase === "running" ||
       timerStates[id].phase === "paused" ||
       timerStates[id].phase === "done"
@@ -8971,14 +8972,8 @@ function App() {
     .map(id => data.children.find(c => c.id === id))
     .filter(Boolean);
 
-  // Show split-timer when:
-  // A) 2+ children already have active timers, OR
-  // B) 1+ children have active timers AND activeChild is navigating to timer view
-  const joiningExistingSession = view === "timer" &&
-    activeChild &&
-    splitEligibleIds.length >= 1 &&
-    !splitEligibleIds.includes(activeChild);
-  const effectiveView = view === "timer" && (splitEligibleIds.length >= 2 || joiningExistingSession)
+  // split-timer när 2+ barn har selecting/running/paused/done
+  const effectiveView = view === "timer" && splitEligibleIds.length >= 2
     ? "split-timer"
     : (view === "routine" && allRoutineKids.length >= 2)
     ? "routine-split"
@@ -8988,16 +8983,10 @@ function App() {
   // Always use splitEligibleIds — it's always current and includes ALL active kids
   const splitSourceIds = splitEligibleIds;
 
-  // Build splitKids: all eligible kids + activeChild if navigating into an existing session
-  const splitSourceIdsWithActive = (activeChild && !splitSourceIds.includes(activeChild) && view === "timer")
-    ? [...splitSourceIds, activeChild]
-    : splitSourceIds;
-  const splitKidsRaw = splitSourceIdsWithActive.map(id =>
-    data.children.find(c => c.id === id)
-  ).filter(Boolean);
-  // De-duplicate
-  const seen = new Set();
-  const splitKids = splitKidsRaw.filter(k => { if (seen.has(k.id)) return false; seen.add(k.id); return true; });
+  // splitKids: alla barn med selecting/running/paused/done — direkt från splitEligibleIds
+  const splitKids = splitSourceIds
+    .map(id => data.children.find(c => c.id === id))
+    .filter(Boolean);
 
   // For back-confirm: check if the child we are viewing has a running timer
   const currentTimerIds = effectiveView === "split-timer"
