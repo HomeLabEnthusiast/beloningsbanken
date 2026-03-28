@@ -2967,7 +2967,7 @@ function HomeView({data, setData, setView, setActiveChild, showToast, showVictor
 
                   return React.createElement('div', {
                       key:child.id,
-                      onClick:()=>{setActiveChild(child.id);setTimerStates(prev => prev[child.id] ? prev : {...prev, [child.id]: {seconds:0,elapsed:0,startedAt:null,running:false,activity:null,phase:"idle"}});setView("timer");},
+                      onClick:()=>{setActiveChild(child.id);setView("timer");},
                       style:{display:"flex",flexDirection:"column",alignItems:"center",cursor:"pointer",flex:"0 0 auto"}
                     }
                     , React.createElement('div', {style:{
@@ -3454,7 +3454,7 @@ function HomeView({data, setData, setView, setActiveChild, showToast, showVictor
                 }}
                 /* Timer */
                 , React.createElement('button', { className:"action-btn",
-                    onClick:()=>{setActiveChild(child.id);setTimerStates(prev => prev[child.id] ? prev : {...prev, [child.id]: {seconds:0,elapsed:0,startedAt:null,running:false,activity:null,phase:"idle"}});setView("timer");},
+                    onClick:()=>{setActiveChild(child.id);setView("timer");},
                     style:{
                       "--action-hover-bg": cTheme.bg,
                       "--action-active-bg": cTheme.chip,
@@ -8948,10 +8948,13 @@ function App() {
     timerStates[id] && (timerStates[id].phase === "running" || timerStates[id].phase === "paused")
   );
 
-  // Split-eligible: any child with a non-null timerState (running, paused, done, OR idle)
-  // idle is included so a child navigating to timer view joins the split immediately
+  // Split-eligible: children with genuinely active timers (running, paused, or done)
   const splitEligibleIds = Object.keys(timerStates).filter(id =>
-    timerStates[id] && timerStates[id].phase !== undefined
+    timerStates[id] && (
+      timerStates[id].phase === "running" ||
+      timerStates[id].phase === "paused" ||
+      timerStates[id].phase === "done"
+    )
   );
 
   // splitSessionIds removed — always use splitEligibleIds directly.
@@ -8968,8 +8971,14 @@ function App() {
     .map(id => data.children.find(c => c.id === id))
     .filter(Boolean);
 
-  // Show split-timer when view is "timer" AND 2+ children have timer states
-  const effectiveView = view === "timer" && splitEligibleIds.length >= 2
+  // Show split-timer when:
+  // A) 2+ children already have active timers, OR
+  // B) 1+ children have active timers AND activeChild is navigating to timer view
+  const joiningExistingSession = view === "timer" &&
+    activeChild &&
+    splitEligibleIds.length >= 1 &&
+    !splitEligibleIds.includes(activeChild);
+  const effectiveView = view === "timer" && (splitEligibleIds.length >= 2 || joiningExistingSession)
     ? "split-timer"
     : (view === "routine" && allRoutineKids.length >= 2)
     ? "routine-split"
@@ -8979,11 +8988,14 @@ function App() {
   // Always use splitEligibleIds — it's always current and includes ALL active kids
   const splitSourceIds = splitEligibleIds;
 
-  // Build splitKids from all eligible IDs, sorted to put activeChild last (joins existing session)
-  const splitKidsRaw = splitSourceIds.map(id =>
+  // Build splitKids: all eligible kids + activeChild if navigating into an existing session
+  const splitSourceIdsWithActive = (activeChild && !splitSourceIds.includes(activeChild) && view === "timer")
+    ? [...splitSourceIds, activeChild]
+    : splitSourceIds;
+  const splitKidsRaw = splitSourceIdsWithActive.map(id =>
     data.children.find(c => c.id === id)
   ).filter(Boolean);
-  // De-duplicate just in case
+  // De-duplicate
   const seen = new Set();
   const splitKids = splitKidsRaw.filter(k => { if (seen.has(k.id)) return false; seen.add(k.id); return true; });
 
