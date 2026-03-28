@@ -3972,9 +3972,9 @@ function TimerView({child, updateChild, showToast, activities, activityCategorie
               )
             )
 
-            /* Idle: small start button under ring */
-            , phase === "idle" && React.createElement('button', {
-                onClick: () => setTimerState(p => ({...p, running:true, phase:"running", startedAt:Date.now(), elapsed:p.startedAt ? (p.elapsed||0)+Math.floor((Date.now()-p.startedAt)/1000) : (p.elapsed||0)})),
+            /* Idle or selecting: small start button under ring */
+            , (phase === "idle" || phase === "selecting") && React.createElement('button', {
+                onClick: () => setTimerState(p => ({...p, running:true, phase:"running", selCat:null, startedAt:Date.now(), elapsed:p.startedAt ? (p.elapsed||0)+Math.floor((Date.now()-p.startedAt)/1000) : (p.elapsed||0)})),
                 style: {
                   marginTop: 8,
                   background: accentColor, color:"white", border:"none",
