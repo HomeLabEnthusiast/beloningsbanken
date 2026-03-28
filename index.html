@@ -3671,9 +3671,9 @@ function TimerPanel({child, updateChild, showToast, activities, activityCategori
 
 
 
-      , phase === "idle" && (
+      , (phase === "idle" || phase === "selecting") && (
         React.createElement('button', { className: "btn-big",
-          onClick: () => setTimerState(p => ({...p, running:true, phase:"running", startedAt:Date.now(), elapsed:p.startedAt ? (p.elapsed||0)+Math.floor((Date.now()-p.startedAt)/1000) : (p.elapsed||0)})),
+          onClick: () => setTimerState(p => ({...p, running:true, phase:"running", selCat:null, startedAt:Date.now(), elapsed:p.startedAt ? (p.elapsed||0)+Math.floor((Date.now()-p.startedAt)/1000) : (p.elapsed||0)})),
           style: circleBtn(act.color||"#f97316", "0 4px 16px rgba(0,0,0,0.12)")}
           , React.createElement('span', { style: {fontSize:iconSz}}, "▶")
           , React.createElement('span', { style: {fontSize:lblSz}}, "START")
@@ -4182,7 +4182,7 @@ function AddThemePicker({value, onChange}) {
   );
 }
 
-const SplitKidCard = React.memo(function SplitKidCard({kid, timerState, setTimerState, acts, showToast, updateChild, setView, setSplitSessionIds, setActiveChild, kidList, timerStates, landscape}) {
+const SplitKidCard = React.memo(function SplitKidCard({kid, timerState, setTimerState, acts, cats, showToast, updateChild, setView, setSplitSessionIds, setActiveChild, kidList, timerStates, landscape}) {
   const col = (() => { const t = getTheme(kid); return {bg:t.bg, border:t.border, accent:t.accent, chip:t.chip, chipText:t.chipText, headerBg:t.headerBg}; })();
   const blank = {seconds:0, elapsed:0, startedAt:null, running:false, activity:acts[0], phase:"idle"};
   const [earnChoice, setEarnChoice] = React.useState(null);
@@ -4303,7 +4303,65 @@ const SplitKidCard = React.memo(function SplitKidCard({kid, timerState, setTimer
             flex:1, minWidth:0, padding:"10px 10px",
             borderRight:".5px solid rgba(0,0,0,0.07)",
             display:"flex", flexDirection:"column", justifyContent:"center"}}
-          , act && (() => {
+
+          /* Selecting: 2-step category → activity picker, state stored per-child in timerState.selCat */
+          , phase === "selecting" && (() => {
+              const selCat = timerState.selCat || null;
+              const useCats = cats && cats.length ? cats : [];
+              if (!selCat) {
+                return React.createElement('div', null
+                  , React.createElement('div', {style:{fontSize:10, color:"#8e8e93", marginBottom:5, letterSpacing:".04em"}}, "välj kategori")
+                  , React.createElement('div', {style:{display:"flex", flexDirection:"column", gap:3, maxHeight:160, overflowY:"auto"}}
+                    , useCats.map(cat =>
+                        React.createElement('button', {key:cat.id,
+                          onClick:()=>setTimerState(p=>({...p, selCat:cat})),
+                          style:{background:"white", border:".5px solid rgba(0,0,0,0.08)",
+                            borderLeft:"3px solid "+(cat.color||"#6c5cc8"),
+                            borderRadius:"0 8px 8px 0", padding:"7px 8px", cursor:"pointer",
+                            display:"flex", alignItems:"center", gap:8, textAlign:"left"}},
+                          React.createElement('span',{style:{fontSize:16,flexShrink:0}},cat.icon||"📂"),
+                          React.createElement('div', null,
+                            React.createElement('div',{style:{fontSize:11,fontWeight:700,color:"#1c1c1e"}},cat.label),
+                            React.createElement('div',{style:{fontSize:9,color:"#8e8e93"}},(cat.activities||[]).length+" akt.")
+                          )
+                        )
+                      )
+                  )
+                );
+              }
+              const catActs = (selCat.activities||[]).sort((a,b)=>a.label.localeCompare(b.label,"sv"));
+              return React.createElement('div', null
+                , React.createElement('div', {style:{display:"flex", alignItems:"center", gap:6, marginBottom:5}}
+                  , React.createElement('button', {
+                      onClick:()=>setTimerState(p=>({...p, selCat:null, activity:null})),
+                      style:{background:"rgba(0,0,0,0.05)",border:"none",borderRadius:50,
+                        width:22,height:22,cursor:"pointer",fontSize:12,
+                        display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}, "←")
+                  , React.createElement('div',{style:{fontSize:10,color:"#8e8e93",letterSpacing:".04em"}},
+                      selCat.icon+" "+selCat.label)
+                )
+                , React.createElement('div', {style:{display:"flex", flexDirection:"column", gap:3, maxHeight:140, overflowY:"auto"}}
+                  , catActs.map(a => {
+                      const isActive = act && act.id===a.id;
+                      return React.createElement('button', {key:a.id,
+                        onClick:()=>setTimerState(p=>({...p, activity:{...a, color:a.color||selCat.color||"#f97316"}, selCat:selCat})),
+                        style:{
+                          background: isActive ? ((selCat.color||"#6c5cc8")+"18") : "white",
+                          border: isActive ? "1.5px solid "+(selCat.color||"#6c5cc8") : ".5px solid rgba(0,0,0,0.08)",
+                          borderRadius:8, padding:"6px 8px", cursor:"pointer",
+                          display:"flex", alignItems:"center", gap:6, textAlign:"left"}},
+                        React.createElement('span',{style:{fontSize:14,flexShrink:0}},a.icon||"⭐"),
+                        React.createElement('span',{style:{fontSize:10,fontWeight:isActive?700:600,
+                          color:isActive?(selCat.color||"#1c1c1e"):"#1c1c1e",
+                          overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}},a.label)
+                      );
+                    })
+                )
+              );
+            })()
+
+          /* Running/paused: show current activity */
+          , phase !== "selecting" && act && (() => {
               const _a = {...(acts.find(a => a.id === act.id)||{}), ...act};
               const diff = _a.difficulty || 1;
               const DIFF_LABEL = ["","Lätt","Medel","Svår"];
@@ -4360,6 +4418,20 @@ const SplitKidCard = React.memo(function SplitKidCard({kid, timerState, setTimer
         )
       )
 
+      , phase === "selecting" && React.createElement('div', { style: {
+          borderTop: "0.5px solid #f0ede8", padding:"10px 12px"}}
+        , React.createElement('button', {
+            onClick: () => setTimerState(p => ({...p, running:true, phase:"running",
+              startedAt:Date.now(), elapsed:0, selCat:null,
+              activity: p.activity || acts[0]})),
+            style:{width:"100%", background:act ? (act.color||"#6c5cc8") : "#6c5cc8",
+              border:"none", borderRadius:10, padding:"10px",
+              color:"white", fontWeight:800, fontSize:13, cursor:"pointer",
+              display:"flex", alignItems:"center", justifyContent:"center", gap:6}},
+          React.createElement('span',{style:{fontSize:16}},"▶"),
+          "Starta timer"
+        )
+      )
       , (phase === "running" || phase === "paused") && React.createElement('div', { style: {
           borderTop: "0.5px solid #f0ede8",
           display:"grid", gridTemplateColumns:"1fr 1fr"}}
@@ -4407,6 +4479,11 @@ const SplitKidCard = React.memo(function SplitKidCard({kid, timerState, setTimer
 }, (prev, next) => {
   if (prev.kid.id !== next.kid.id) return false;
   if (prev.timerState.phase !== next.timerState.phase) return false;
+  // Allow re-render when category or activity selection changes
+  if (next.timerState.phase === "selecting") {
+    if ((prev.timerState.selCat||{}).id !== (next.timerState.selCat||{}).id) return false;
+    if ((prev.timerState.activity||{}).id !== (next.timerState.activity||{}).id) return false;
+  }
   if (next.timerState.phase === "done" || next.timerState.phase === "idle") return true;
   return false;
 });
@@ -4446,7 +4523,7 @@ function SplitTimerView({kidList, updateChild, showToast, activities, activityCa
             }));
           return React.createElement(SplitKidCard, {
             key: kid.id,
-            kid, timerState, setTimerState, acts,
+            kid, timerState, setTimerState, acts, cats,
             showToast, updateChild, setView, setSplitSessionIds,
             setActiveChild, kidList, timerStates,
             landscape
