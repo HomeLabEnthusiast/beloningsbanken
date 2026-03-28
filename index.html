@@ -4459,7 +4459,13 @@ function SplitTimerView({kidList, updateChild, showToast, activities, activityCa
 
 
 function BackConfirmDialog({onStay, onKeepAndLeave, onSaveAndLeave, onDiscardAndLeave, onDiscardOne, mode, setMode, splitKids, data}) {
-  const isSplit = splitKids && splitKids.length >= 2;
+  const count = splitKids ? splitKids.length : 0;
+  const isMulti = count >= 2;
+
+  /* Dynamic text helpers */
+  const nKids   = count === 1 ? "1 barn" : count + " barn";
+  const allAkt  = count === 1 ? "aktiviteten" : "alla aktiviteter";
+  const allasTid = count === 1 ? "tid" : "allas tid";
 
   /* shared button styles */
   const btnPrimary = (color) => ({
@@ -4481,18 +4487,14 @@ function BackConfirmDialog({onStay, onKeepAndLeave, onSaveAndLeave, onDiscardAnd
     return (
       React.createElement('div', { className: "modal-backdrop"}
         , React.createElement('div', { className: "modal-box", style: {maxWidth:400, padding:"20px 20px 16px"}}
-
-          /* Header */
           , React.createElement('div', { style: {marginBottom:16}}
             , React.createElement('div', { style: {fontSize:12, color:"#8e8e93", fontWeight:500,
                 letterSpacing:".05em", marginBottom:4}}, "AVBRYT AKTIVITET")
             , React.createElement('div', { style: {fontSize:17, fontWeight:700, color:"#1c1c1e",
                 lineHeight:1.3}}, "Vems aktivitet avbryts?")
             , React.createElement('p', { style: {color:"#8e8e93", fontSize:13, lineHeight:1.5, margin:"4px 0 0"}},
-              "Det andra barnet påverkas inte.")
+              "Övriga barn påverkas inte.")
           )
-
-          /* Kid buttons */
           , React.createElement('div', { style: {display:"flex", flexDirection:"column", gap:8, marginBottom:10}}
             , splitKids.map(kid => {
                 const t = getTheme(kid);
@@ -4500,7 +4502,7 @@ function BackConfirmDialog({onStay, onKeepAndLeave, onSaveAndLeave, onDiscardAnd
                   key: kid.id,
                   onClick: () => onDiscardOne(kid.id),
                   style: {
-                    background: "white", border: `1.5px solid #fca5a5`,
+                    background: "white", border: "1.5px solid #fca5a5",
                     borderRadius: 12, padding: "10px 14px",
                     cursor: "pointer", display: "flex", alignItems: "center", gap: 12,
                     width: "100%", textAlign: "left"
@@ -4517,8 +4519,6 @@ function BackConfirmDialog({onStay, onKeepAndLeave, onSaveAndLeave, onDiscardAnd
                 );
               })
           )
-
-          /* Back */
           , React.createElement('button', {
               onClick: () => setMode("default"),
               style: {background: "none", border: "none", padding: "8px 0",
@@ -4546,48 +4546,45 @@ function BackConfirmDialog({onStay, onKeepAndLeave, onSaveAndLeave, onDiscardAnd
               display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22}}, "⏱")
           , React.createElement('div', null
             , React.createElement('div', { style: {fontSize: 15, fontWeight: 700, color: "#1c1c1e"}},
-                isSplit ? "Timers pågår" : "Timer pågår")
+                isMulti ? count + " timers pågår" : "Timer pågår")
             , React.createElement('div', { style: {fontSize: 12, color: "#8e8e93", marginTop: 1}},
-                isSplit ? "Båda barnen har aktiva timers" : "Det finns en aktiv timer")
+                isMulti
+                  ? splitKids.map(k => k.name).join(", ") + " har aktiva timers"
+                  : "Det finns en aktiv timer")
           )
         )
 
         /* Actions */
         , React.createElement('div', { style: {display: "flex", flexDirection: "column", gap: 8}}
 
-          /* Fortsätt — primary */
           , React.createElement('button', { onClick: onStay, style: btnPrimary("#6c5cc8")}
             , React.createElement('span', {style:{fontSize:16}}, "▶")
-            , isSplit ? "Fortsätt båda aktiviteterna" : "Fortsätt timern"
+            , isMulti ? "Fortsätt alla aktiviteter" : "Fortsätt timern"
           )
 
-          /* Låt köra + gå tillbaka — subtle */
           , React.createElement('button', { onClick: onKeepAndLeave,
               style: btnOutline("rgba(0,0,0,0.08)", "#3c3c43", "#f8f7f5")}
             , React.createElement('span', {style:{fontSize:16}}, "⏱")
-            , isSplit ? "Låt båda köra — gå tillbaka" : "Låt timern köra — gå tillbaka"
+            , isMulti ? "Låt alla köra — gå tillbaka" : "Låt timern köra — gå tillbaka"
           )
 
-          /* Split: välj barn — amber */
-          , isSplit && React.createElement('button', {
+          , isMulti && React.createElement('button', {
               onClick: () => setMode("pick-child"),
               style: btnOutline("#f8dca0", "#8a6000", "#fef3e0")}
             , React.createElement('span', {style:{fontSize:16}}, "✂️")
             , "Välj vilket barn att avbryta"
           )
 
-          /* Spara tid — green outline */
           , React.createElement('button', { onClick: onSaveAndLeave,
               style: btnOutline("#b8e8d4", "#0f5c38", "#e8faf0")}
             , React.createElement('span', {style:{fontSize:16}}, "💾")
-            , isSplit ? "Spara bådas tid och gå tillbaka" : "Spara tid och gå tillbaka"
+            , isMulti ? "Spara allas tid och gå tillbaka" : "Spara tid och gå tillbaka"
           )
 
-          /* Avbryt — danger subtle */
           , React.createElement('button', { onClick: onDiscardAndLeave,
               style: btnOutline("#fecdd3", "#b91c1c", "#fff1f2")}
             , React.createElement('span', {style:{fontSize:16}}, "🗑")
-            , isSplit ? "Avbryt båda aktiviteterna" : "Avbryt timer och gå tillbaka"
+            , isMulti ? "Avbryt alla aktiviteter" : "Avbryt timer och gå tillbaka"
           )
         )
       )
@@ -8983,7 +8980,7 @@ function App() {
 
   // For back-confirm: check if the child we are viewing has a running timer
   const currentTimerIds = effectiveView === "split-timer"
-    ? splitSourceIds
+    ? splitEligibleIds
     : (activeChild ? [activeChild] : []);
 
   const hasRunningTimer = () =>
