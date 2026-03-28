@@ -4242,8 +4242,18 @@ const SplitKidCard = React.memo(function SplitKidCard({kid, timerState, setTimer
         /* If others are still active — show continue button prominently */
         , nextKid && React.createElement('button', {
             onClick: () => {
-              setSplitSessionIds(prev => prev.filter(id => id !== kid.id));
               if (setActiveChild) setActiveChild(nextKid.id);
+              // If only one child remains active, go to single TimerView
+              const remainingActive = (kidList||[]).filter(k =>
+                k.id !== kid.id &&
+                timerStates && timerStates[k.id] &&
+                (timerStates[k.id].phase === "running" ||
+                 timerStates[k.id].phase === "paused" ||
+                 timerStates[k.id].phase === "selecting")
+              );
+              if (remainingActive.length === 1) {
+                setView("timer");
+              }
             },
             style: {
               width:"100%", background: col.headerBg||col.accent, border:"none",
@@ -4296,6 +4306,35 @@ const SplitKidCard = React.memo(function SplitKidCard({kid, timerState, setTimer
         , phase === "paused" && React.createElement('div', { style: {
             background:"rgba(0,0,0,0.2)", borderRadius:50, padding:"3px 10px",
             fontSize:11, fontWeight:600, color:"rgba(255,255,255,0.8)"}}, "Pausad")
+        /* ── × dismiss button ── */
+        , React.createElement('button', {
+            onClick: () => {
+              // Pause the timer before dismissing
+              setTimerState(p => p.phase === "running"
+                ? {...p, running:false, phase:"paused",
+                    elapsed: p.startedAt ? (p.elapsed||0)+Math.floor((Date.now()-p.startedAt)/1000) : (p.elapsed||0),
+                    startedAt: null}
+                : p);
+              const remaining = (kidList||[]).filter(k =>
+                k.id !== kid.id &&
+                timerStates && timerStates[k.id] &&
+                (timerStates[k.id].phase === "running" ||
+                 timerStates[k.id].phase === "paused" ||
+                 timerStates[k.id].phase === "selecting")
+              );
+              if (remaining.length === 0) {
+                setView("home");
+              } else if (remaining.length === 1) {
+                if (setActiveChild) setActiveChild(remaining[0].id);
+                setView("timer");
+              }
+              // If 2+ remain, stay in split — this card will become idle and show done-screen
+            },
+            style:{width:28, height:28, borderRadius:"50%",
+              background:"rgba(0,0,0,0.25)", border:"none",
+              color:"white", fontWeight:900, fontSize:14,
+              cursor:"pointer", display:"flex", alignItems:"center",
+              justifyContent:"center", flexShrink:0, marginLeft:4}}, "×")
       )
 
       , React.createElement('div', { style: {display:"flex", gap:0}}
@@ -9055,6 +9094,16 @@ function App() {
     : (view === "routine" && allRoutineKids.length >= 2)
     ? "routine-split"
     : view;
+
+  // When dropping from split to single: auto-set activeChild to the remaining active child
+  React.useEffect(() => {
+    if (view === "timer" && splitEligibleIds.length === 1) {
+      const remainingId = splitEligibleIds[0];
+      if (remainingId && remainingId !== activeChild) {
+        setActiveChild(remainingId);
+      }
+    }
+  }, [splitEligibleIds.join(","), view]);
 
   // The children shown in split view — use session ids if available, else eligible
   // Always use splitEligibleIds — it's always current and includes ALL active kids
