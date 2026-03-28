@@ -4182,7 +4182,7 @@ function AddThemePicker({value, onChange}) {
   );
 }
 
-const SplitKidCard = React.memo(function SplitKidCard({kid, timerState, setTimerState, acts, cats, showToast, updateChild, setView, setSplitSessionIds, setActiveChild, kidList, timerStates, landscape}) {
+function SplitKidCard({kid, timerState, setTimerState, acts, cats, showToast, updateChild, setView, setSplitSessionIds, setActiveChild, kidList, timerStates, setBackConfirm, setDismissChildId, landscape}) {
   const col = (() => { const t = getTheme(kid); return {bg:t.bg, border:t.border, accent:t.accent, chip:t.chip, chipText:t.chipText, headerBg:t.headerBg}; })();
   const blank = {seconds:0, elapsed:0, startedAt:null, running:false, activity:acts[0], phase:"idle"};
   const [earnChoice, setEarnChoice] = React.useState(null);
@@ -4306,29 +4306,30 @@ const SplitKidCard = React.memo(function SplitKidCard({kid, timerState, setTimer
         , phase === "paused" && React.createElement('div', { style: {
             background:"rgba(0,0,0,0.2)", borderRadius:50, padding:"3px 10px",
             fontSize:11, fontWeight:600, color:"rgba(255,255,255,0.8)"}}, "Pausad")
-        /* ── × dismiss button ── */
+        /* ── × dismiss button — shows confirm dialog if timer is running/paused ── */
         , React.createElement('button', {
             onClick: () => {
-              // Pause the timer before dismissing
-              setTimerState(p => p.phase === "running"
-                ? {...p, running:false, phase:"paused",
-                    elapsed: p.startedAt ? (p.elapsed||0)+Math.floor((Date.now()-p.startedAt)/1000) : (p.elapsed||0),
-                    startedAt: null}
-                : p);
-              const remaining = (kidList||[]).filter(k =>
-                k.id !== kid.id &&
-                timerStates && timerStates[k.id] &&
-                (timerStates[k.id].phase === "running" ||
-                 timerStates[k.id].phase === "paused" ||
-                 timerStates[k.id].phase === "selecting")
-              );
-              if (remaining.length === 0) {
-                setView("home");
-              } else if (remaining.length === 1) {
-                if (setActiveChild) setActiveChild(remaining[0].id);
-                setView("timer");
+              const isActive = timerState && (timerState.phase === "running" || timerState.phase === "paused");
+              if (isActive && setBackConfirm && setDismissChildId) {
+                // Show BackConfirmDialog for this specific child
+                setDismissChildId(kid.id);
+                setBackConfirm(true);
+              } else {
+                // No active timer — just remove directly
+                setTimerState(null);
+                const remaining = (kidList||[]).filter(k =>
+                  k.id !== kid.id &&
+                  timerStates && timerStates[k.id] &&
+                  (timerStates[k.id].phase === "running" ||
+                   timerStates[k.id].phase === "paused" ||
+                   timerStates[k.id].phase === "selecting")
+                );
+                if (remaining.length === 0) setView("home");
+                else if (remaining.length === 1) {
+                  if (setActiveChild) setActiveChild(remaining[0].id);
+                  setView("timer");
+                }
               }
-              // If 2+ remain, stay in split — this card will become idle and show done-screen
             },
             style:{width:28, height:28, borderRadius:"50%",
               background:"rgba(0,0,0,0.25)", border:"none",
@@ -4515,19 +4516,9 @@ const SplitKidCard = React.memo(function SplitKidCard({kid, timerState, setTimer
     )
 
   );
-}, (prev, next) => {
-  if (prev.kid.id !== next.kid.id) return false;
-  if (prev.timerState.phase !== next.timerState.phase) return false;
-  // Allow re-render when category or activity selection changes
-  if (next.timerState.phase === "selecting") {
-    if ((prev.timerState.selCat||{}).id !== (next.timerState.selCat||{}).id) return false;
-    if ((prev.timerState.activity||{}).id !== (next.timerState.activity||{}).id) return false;
-  }
-  if (next.timerState.phase === "done" || next.timerState.phase === "idle") return true;
-  return false;
-});
+}
 
-function SplitTimerView({kidList, updateChild, showToast, activities, activityCategories, timerStates, setTimerStates, setView, setActiveChild, setSplitSessionIds}) {
+function SplitTimerView({kidList, updateChild, showToast, activities, activityCategories, timerStates, setTimerStates, setView, setActiveChild, setBackConfirm, setDismissChildId, setSplitSessionIds}) {
   const cats = (activityCategories && activityCategories.length)
     ? activityCategories : DEFAULT_ACTIVITY_CATEGORIES;
   const allCatActs = cats.flatMap(c => (c.activities||[]).map(a => ({
@@ -4565,6 +4556,7 @@ function SplitTimerView({kidList, updateChild, showToast, activities, activityCa
             kid, timerState, setTimerState, acts, cats,
             showToast, updateChild, setView, setSplitSessionIds,
             setActiveChild, kidList, timerStates,
+            setBackConfirm, setDismissChildId,
             landscape
           });
         })
@@ -8868,6 +8860,7 @@ function App() {
   });
   const [backConfirm,   setBackConfirm]   = useState(false);
   const [backConfirmMode, setBackConfirmMode] = useState("default"); // "default" | "pick-child"
+  const [dismissChildId, setDismissChildId] = useState(null); // which child X was clicked for
   const [toastMsg,      setToastMsg]      = useState(null);
   const [victoryCard,   setVictoryCard]   = useState(null); // {emoji,title,lines:[]}
   const [adminUnlocked, setAdminUnlocked] = useState(false);
@@ -9284,6 +9277,7 @@ function App() {
           activityCategories: (data.activityCategories && data.activityCategories.length) ? data.activityCategories : DEFAULT_ACTIVITY_CATEGORIES,
           timerStates: timerStates, setTimerStates: setTimerStates,
           setView: setView, setActiveChild: setActiveChild,
+          setBackConfirm: setBackConfirm, setDismissChildId: setDismissChildId,
           setSplitSessionIds: setSplitSessionIds})
       )
       , effectiveView === "rewards" && (
@@ -9466,10 +9460,39 @@ function App() {
 
       , backConfirm && (
         React.createElement(BackConfirmDialog, {
-          onStay: () => { setBackConfirm(false); setBackConfirmMode("default"); },
-          onKeepAndLeave: keepAndGoHome,
-          onSaveAndLeave: saveTimersAndGoHome,
-          onDiscardAndLeave: discardTimersAndGoHome,
+          onStay: () => {
+            setBackConfirm(false);
+            setBackConfirmMode("default");
+            setDismissChildId(null);
+          },
+          onKeepAndLeave: dismissChildId
+            ? () => { setBackConfirm(false); setBackConfirmMode("default"); setDismissChildId(null); }
+            : keepAndGoHome,
+          onSaveAndLeave: dismissChildId
+            ? () => {
+                // Save this child's timer then remove from split
+                const ts = timerStates[dismissChildId];
+                if (ts && ts.seconds >= 5) {
+                  const mins = Math.ceil(ts.seconds / 60);
+                  const c = data.children.find(ch => ch.id === dismissChildId);
+                  if (c) {
+                    const entry = {id:Date.now()+Math.random(), activity:ts.activity&&ts.activity.id,
+                      label:ts.activity&&ts.activity.label, icon:ts.activity&&ts.activity.icon,
+                      minutes:mins, date:new Date().toLocaleDateString("sv-SE")};
+                    updateChild(dismissChildId, {balance:c.balance+mins, history:[entry,...(c.history||[])]});
+                    showToast("💾 +"+mins+" min sparades för "+c.name+"!");
+                  }
+                }
+                setTimerStates(prev => { const n={...prev}; delete n[dismissChildId]; return n; });
+                setBackConfirm(false); setBackConfirmMode("default"); setDismissChildId(null);
+              }
+            : saveTimersAndGoHome,
+          onDiscardAndLeave: dismissChildId
+            ? () => {
+                setTimerStates(prev => { const n={...prev}; delete n[dismissChildId]; return n; });
+                setBackConfirm(false); setBackConfirmMode("default"); setDismissChildId(null);
+              }
+            : discardTimersAndGoHome,
           onDiscardOne: discardOneTimerAndGoHome,
           mode: backConfirmMode,
           setMode: setBackConfirmMode,
