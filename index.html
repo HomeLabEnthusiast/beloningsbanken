@@ -2967,7 +2967,7 @@ function HomeView({data, setData, setView, setActiveChild, showToast, showVictor
 
                   return React.createElement('div', {
                       key:child.id,
-                      onClick:()=>{setActiveChild(child.id);setTimerStates(prev => ({...prev, [child.id]: {...(prev[child.id]||{}), phase:"selecting", seconds:0, elapsed:0, startedAt:null, running:false}}));setView("timer");},
+                      onClick:()=>{setActiveChild(child.id);const existing = timerStates && timerStates[child.id];const alreadyActive = existing && (existing.phase==="running"||existing.phase==="paused");if (!alreadyActive) {setTimerStates(prev => ({...prev, [child.id]: {...(prev[child.id]||{}), phase:"selecting", seconds:0, elapsed:0, startedAt:null, running:false}}));}setView("timer");},
                       style:{display:"flex",flexDirection:"column",alignItems:"center",cursor:"pointer",flex:"0 0 auto"}
                     }
                     , React.createElement('div', {style:{
@@ -3454,7 +3454,7 @@ function HomeView({data, setData, setView, setActiveChild, showToast, showVictor
                 }}
                 /* Timer */
                 , React.createElement('button', { className:"action-btn",
-                    onClick:()=>{setActiveChild(child.id);setTimerStates(prev => ({...prev, [child.id]: {...(prev[child.id]||{}), phase:"selecting", seconds:0, elapsed:0, startedAt:null, running:false}}));setView("timer");},
+                    onClick:()=>{setActiveChild(child.id);const existing = timerStates && timerStates[child.id];const alreadyActive = existing && (existing.phase==="running"||existing.phase==="paused");if (!alreadyActive) {setTimerStates(prev => ({...prev, [child.id]: {...(prev[child.id]||{}), phase:"selecting", seconds:0, elapsed:0, startedAt:null, running:false}}));}setView("timer");},
                     style:{
                       "--action-hover-bg": cTheme.bg,
                       "--action-active-bg": cTheme.chip,
